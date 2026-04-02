@@ -355,7 +355,7 @@ export default definePlugin({
             ]
         },
         {
-            find: 'location:"ForYou"});',
+            find: 'updateAsync("inbox"',
             replacement: {
                 match: /:(\i)===\i\.\i\.MENTIONS\?\(0,.+?onJump:(\i)}\)/,
                 replace: ": $1 === 8 ? $self.tryKeywordMenu($2) $&"
