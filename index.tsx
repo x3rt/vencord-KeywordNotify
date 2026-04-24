@@ -355,7 +355,7 @@ export default definePlugin({
             ]
         },
         {
-            find: 'updateAsync("inbox"',
+            find: /MENTIONS\?\(0,.+?onJump:\i}\)/,
             replacement: {
                 match: /:(\i)===\i\.\i\.MENTIONS\?\(0,.+?onJump:(\i)}\)/,
                 replace: ": $1 === 8 ? $self.tryKeywordMenu($2) $&"
