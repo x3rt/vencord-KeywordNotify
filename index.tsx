@@ -35,7 +35,13 @@ import type { JSX, PropsWithChildren } from "react";
 
 
 type IconProps = JSX.IntrinsicElements["svg"];
-type KeywordEntry = { regex: string, listIds: Array<string>, listType: ListType, ignoreCase: boolean; };
+interface KeywordEntry {
+    regex: string
+    listIds: string[]
+    listType: ListType
+    ignoreCase: boolean
+    ignoreBots?: boolean
+}
 
 let keywordEntries: Array<KeywordEntry> = [];
 let keywordLog: Array<any> = [];
@@ -54,7 +60,7 @@ const KEYWORD_LOG_KEY = "KeywordNotify_log";
 const cl = classNameFactory("vc-keywordnotify-");
 
 async function addKeywordEntry(forceUpdate: () => void) {
-    keywordEntries.push({ regex: "", listIds: [], listType: ListType.BlackList, ignoreCase: false });
+    keywordEntries.push({ regex: "", listIds: [], listType: ListType.BlackList, ignoreCase: false, ignoreBots: true });
     await DataStore.set(KEYWORD_ENTRIES_KEY, keywordEntries);
     forceUpdate();
 }
@@ -158,7 +164,7 @@ function ListedIds({ listIds, setListIds }) {
                     variant="none"
                     size="iconOnly"
                     className={cl("delete")}>
-                    <DeleteIcon/>
+                    <DeleteIcon />
                 </Button>
             </Flex>
         );
@@ -216,6 +222,12 @@ function KeywordEntries() {
         update();
     }
 
+    async function setIgnoreBots(index: number, value: boolean) {
+        keywordEntries[index].ignoreBots = value,
+        await DataStore.set(KEYWORD_ENTRIES_KEY, keywordEntries);
+        update();
+    }
+
     const elements = keywordEntries.map((entry, i) => {
         return (
             <>
@@ -234,7 +246,7 @@ function KeywordEntries() {
                             variant="none"
                             size="iconOnly"
                             className={cl("delete")}>
-                            <DeleteIcon/>
+                            <DeleteIcon />
                         </Button>
                     </Flex>
                     <FormSwitch
@@ -245,20 +257,29 @@ function KeywordEntries() {
                         title="Ignore Case"
                         className={cl("ignoreCaseSwitch")}
                     />
+                    <FormSwitch
+                        value={values[i].ignoreBots ?? false}
+                        onChange={() => {
+                            setIgnoreBots(i, !values[i].ignoreBots);
+                        }}
+                        title="Ignore Bots"
+                        description="Ignore messages from bots"
+                        className={cl("ignoreCaseSwitch")}
+                    />
                     <Heading tag="h5">Whitelist/Blacklist</Heading>
                     <Flex flexDirection="row">
                         <div style={{ flexGrow: 1 }}>
-                            <ListedIds listIds={values[i].listIds} setListIds={e => setListIds(i, e)}/>
+                            <ListedIds listIds={values[i].listIds} setListIds={e => setListIds(i, e)} />
                         </div>
                     </Flex>
-                    <div className={[Margins.top8, Margins.bottom8].join(" ")}/>
+                    <div className={[Margins.top8, Margins.bottom8].join(" ")} />
                     <Flex flexDirection="row">
                         <Button onClick={() => {
                             values[i].listIds.push("");
                             update();
                         }}>Add ID</Button>
                         <div style={{ flexGrow: 1 }}>
-                            <ListTypeSelector listType={values[i].listType} setListType={e => setListType(i, e)}/>
+                            <ListTypeSelector listType={values[i].listType} setListType={e => setListType(i, e)} />
                         </div>
                     </Flex>
                 </Collapsible>
@@ -308,20 +329,22 @@ function DoubleCheckmarkIcon(props: IconProps) {
             height={16}
         >
             <path fill="currentColor"
-                  d="M16.7 8.7a1 1 0 0 0-1.4-1.4l-3.26 3.24a1 1 0 0 0 1.42 1.42L16.7 8.7ZM3.7 11.3a1 1 0 0 0-1.4 1.4l4.5 4.5a1 1 0 0 0 1.4-1.4l-4.5-4.5Z"
+                d="M16.7 8.7a1 1 0 0 0-1.4-1.4l-3.26 3.24a1 1 0 0 0 1.42 1.42L16.7 8.7ZM3.7 11.3a1 1 0 0 0-1.4 1.4l4.5 4.5a1 1 0 0 0 1.4-1.4l-4.5-4.5Z"
             />
             <path fill="currentColor"
-                  d="M21.7 9.7a1 1 0 0 0-1.4-1.4L13 15.58l-3.3-3.3a1 1 0 0 0-1.4 1.42l4 4a1 1 0 0 0 1.4 0l8-8Z"
+                d="M21.7 9.7a1 1 0 0 0-1.4-1.4L13 15.58l-3.3-3.3a1 1 0 0 0-1.4 1.42l4 4a1 1 0 0 0 1.4 0l8-8Z"
             />
         </Icon>
     );
 }
 
 const settings = definePluginSettings({
+    // TODO: remove when the migration snippet on async start() is removed
     ignoreBots: {
         type: OptionType.BOOLEAN,
         description: "Ignore messages from bots",
-        default: true
+        default: true,
+        hidden: true,
     },
     amountToKeep: {
         type: OptionType.NUMBER,
@@ -331,7 +354,7 @@ const settings = definePluginSettings({
     keywords: {
         type: OptionType.COMPONENT,
         description: "Manage keywords",
-        component: () => <KeywordEntries/>
+        component: () => <KeywordEntries />
     }
 });
 
@@ -377,6 +400,9 @@ export default definePlugin({
     async start() {
         this.onUpdate = () => null;
         keywordEntries = await DataStore.get(KEYWORD_ENTRIES_KEY) ?? [];
+        // HACK: migration to add default ignoreBots value config per keyword
+        // TODO: remove after a while
+        keywordEntries.forEach(entry => entry.ignoreBots = entry.ignoreBots ?? this.settings.store.ignoreBots);
         await DataStore.set(KEYWORD_ENTRIES_KEY, keywordEntries);
         (await DataStore.get(KEYWORD_LOG_KEY) ?? []).map(e => JSON.parse(e)).forEach(e => {
             try {
@@ -423,7 +449,7 @@ export default definePlugin({
                 continue;
             }
 
-            if (settings.store.ignoreBots && m.author.bot && (!whitelistMode || !entry.listIds.includes(m.author.id))) {
+            if (entry.ignoreBots && m.author.bot && (!whitelistMode || !entry.listIds.includes(m.author.id))) {
                 continue;
             }
 
@@ -533,7 +559,7 @@ export default definePlugin({
                             DataStore.set(KEYWORD_LOG_KEY, []);
                             this.onUpdate();
                         }}>
-                        <DoubleCheckmarkIcon/>
+                        <DoubleCheckmarkIcon />
                     </Button>
                 )}
             </Tooltip>
