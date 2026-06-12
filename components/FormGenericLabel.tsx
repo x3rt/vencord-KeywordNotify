@@ -12,9 +12,11 @@ import { classNameFactory } from "@utils/css";
 import { classes } from "@utils/misc";
 import type { ReactNode } from "react";
 
-const cl = classNameFactory("vc-form-generic-label-");
+import { cl as pluginCl } from "..";
 
-export interface FormGenericLabelProps {
+const cl = classNameFactory(pluginCl("form-generic-label-"));
+
+interface FormGenericLabelProps {
     title: ReactNode;
     description?: ReactNode;
 
@@ -28,7 +30,7 @@ export interface FormGenericLabelProps {
 export function FormGenericLabel({ title, description, disabled, className, hideBorder, children }: FormGenericLabelProps) {
     return (
         <label className={cl("wrapper")}>
-            <div className={classes("vc-form-generic-label", className, disabled && cl("disabled"))}>
+            <div className={classes(pluginCl("form-generic-label"), className, disabled && cl("disabled"))}>
                 <div className={cl("text")}>
                     <Span size="md" weight="medium">{title}</Span>
                     {description && <Span size="sm" weight="normal">{description}</Span>}

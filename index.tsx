@@ -8,35 +8,26 @@ import "./style.css";
 
 import { DataStore } from "@api/index";
 import { definePluginSettings } from "@api/Settings";
-import { Button, TextButton } from "@components/Button";
-import { Flex } from "@components/Flex";
-import { FormSwitch } from "@components/FormSwitch";
-import { Heading } from "@components/Heading";
-import { DeleteIcon } from "@components/Icons";
+import { Button } from "@components/Button";
 import { classNameFactory } from "@utils/css";
-import { Margins } from "@utils/margins";
 import { classes } from "@utils/misc";
-import { useForceUpdater } from "@utils/react";
 import definePlugin, { OptionType } from "@utils/types";
 import { Message } from "@vencord/discord-types";
 import { findByCodeLazy, findCssClassesLazy } from "@webpack";
 import {
     ChannelStore,
     FluxDispatcher,
-    Select,
     SelectedChannelStore,
     TabBar,
-    TextInput,
     Tooltip,
     UserStore,
     useState
 } from "@webpack/common";
-import type { JSX, PropsWithChildren } from "react";
 
-import { FormGenericLabel } from "./components/FormGenericLabel";
+import { DoubleCheckmarkIcon } from "./components/Icons";
+import { KeywordEntries } from "./components/KeywordEntries";
 
 
-type IconProps = JSX.IntrinsicElements["svg"];
 interface KeywordEntry {
     regex: string;
     listIds?: string[];
@@ -48,7 +39,7 @@ interface KeywordEntry {
     listPriority: ListType;
 }
 
-let keywordEntries: Array<KeywordEntry> = [];
+export let keywordEntries: Array<KeywordEntry> = [];
 let keywordLog: Array<any> = [];
 let interceptor: (e: any) => void;
 
@@ -59,12 +50,12 @@ const tabClass = findCssClassesLazy("inboxTitle", "tab");
 // const MenuHeader = findByCodeLazy(".getUnseenInviteCount())");
 const Popout = findByCodeLazy("getProTip", "canCloseAllMessages:");
 const createMessageRecord = findByCodeLazy(".createFromServer(", ".isBlockedForMessage", "messageReference:");
-const KEYWORD_ENTRIES_KEY = "KeywordNotify_keywordEntries";
+export const KEYWORD_ENTRIES_KEY = "KeywordNotify_keywordEntries";
 const KEYWORD_LOG_KEY = "KeywordNotify_log";
 
 export const cl = classNameFactory("vc-keywordnotify-");
 
-async function addKeywordEntry(forceUpdate: () => void) {
+export async function addKeywordEntry(forceUpdate: () => void) {
     keywordEntries.push({
         regex: "",
         ignoreCase: false,
@@ -77,7 +68,7 @@ async function addKeywordEntry(forceUpdate: () => void) {
     forceUpdate();
 }
 
-async function removeKeywordEntry(idx: number, forceUpdate: () => void) {
+export async function removeKeywordEntry(idx: number, forceUpdate: () => void) {
     keywordEntries.splice(idx, 1);
     await DataStore.set(KEYWORD_ENTRIES_KEY, keywordEntries);
     forceUpdate();
@@ -91,13 +82,9 @@ function safeMatchesRegex(str: string, regex: string, flags: string) {
     }
 }
 
-enum ListType {
+export enum ListType {
     BlackList = "BlackList",
     Whitelist = "Whitelist"
-}
-
-interface BaseIconProps extends IconProps {
-    viewBox: string;
 }
 
 function highlightKeywords(str: string, entries: Array<KeywordEntry>) {
@@ -121,265 +108,6 @@ function highlightKeywords(str: string, entries: Array<KeywordEntry>) {
             <span className="highlight">{matches[0]}</span>
             <span>{str.substring(idx + matches[0].length)}</span>
         </>
-    );
-}
-
-function Collapsible({ title, children }) {
-    const [isOpen, setIsOpen] = useState(false);
-
-    return (
-        <div>
-            <TextButton
-                onClick={() => setIsOpen(!isOpen)}
-                className={cl("collapsible")}>
-                <div style={{ display: "flex", alignItems: "center" }}>
-                    <div style={{
-                        marginLeft: "auto",
-                        color: "var(--text-muted)",
-                        paddingRight: "5px"
-                    }}>{isOpen ? "▼" : "▶"}</div>
-                    <Heading tag="h4">{title}</Heading>
-                </div>
-            </TextButton>
-            {isOpen && children}
-        </div>
-    );
-}
-
-function ListedIds({ listIds, setListIds }: { listIds: string[], setListIds: (v: string[]) => void; }) {
-    const update = useForceUpdater();
-    const [values] = useState(listIds);
-
-    async function onChange(e: string, index: number) {
-        values[index] = e.trim();
-        setListIds(values);
-        update();
-    }
-
-    const elements = values.map((currentValue: string, index: number) => {
-        return (
-            <Flex key={index} flexDirection="row" style={{ marginBottom: "5px" }}>
-                <div style={{ flexGrow: 1 }}>
-                    <TextInput
-                        placeholder="ID"
-                        spellCheck={false}
-                        value={currentValue}
-                        onChange={e => onChange(e, index)}
-                    />
-                </div>
-                <Button
-                    onClick={() => {
-                        values.splice(index, 1);
-                        setListIds(values);
-                        update();
-                    }}
-                    variant="none"
-                    size="iconOnly"
-                    className={cl("delete")}>
-                    <DeleteIcon />
-                </Button>
-            </Flex>
-        );
-    });
-
-    return (
-        <>
-            {elements}
-        </>
-    );
-}
-
-function ListPrioritySelector({ listType, setListPriority }: { listType: ListType, setListPriority: (v: ListType) => void; }) {
-    return (
-        <Select
-            options={[
-                { label: "Whitelist", value: ListType.Whitelist },
-                { label: "Blacklist", value: ListType.BlackList }
-            ]}
-            placeholder={"Select a list type"}
-            isSelected={v => v === listType}
-            closeOnSelect={true}
-            select={setListPriority}
-            serialize={v => v}
-        />
-    );
-}
-
-
-function KeywordEntries() {
-    const update = useForceUpdater();
-    const [values] = useState(keywordEntries);
-    // const [entryType, setEntryType] = useState(ListType.Whitelist);
-
-    async function updateStoreAndRender() {
-        await DataStore.set(KEYWORD_ENTRIES_KEY, keywordEntries);
-        update();
-    }
-
-    async function setRegex(index: number, value: string) {
-        keywordEntries[index].regex = value;
-        updateStoreAndRender();
-    }
-
-    async function setListPriority(index: number, value: ListType) {
-        keywordEntries[index].listPriority = value;
-        updateStoreAndRender();
-    }
-
-    async function setWhitelist(index: number, value: string[]) {
-        keywordEntries[index].whitelist = value;
-        updateStoreAndRender();
-    }
-
-    async function setBlacklist(index: number, value: string[]) {
-        keywordEntries[index].blacklist = value;
-        updateStoreAndRender();
-    }
-
-    async function setIgnoreCase(index: number, value: boolean) {
-        keywordEntries[index].ignoreCase = value;
-        updateStoreAndRender();
-    }
-
-    async function setIgnoreBots(index: number, value: boolean) {
-        keywordEntries[index].ignoreBots = value,
-        updateStoreAndRender();
-    }
-
-    const elements = keywordEntries.map((entry, i) => {
-        return (
-            <>
-                <Collapsible title={`Keyword Entry ${i + 1}`}>
-                    <Flex flexDirection="row">
-                        <div style={{ flexGrow: 1 }}>
-                            <TextInput
-                                placeholder="example|regex"
-                                spellCheck={false}
-                                value={values[i].regex}
-                                onChange={e => setRegex(i, e)}
-                            />
-                        </div>
-                        <Button
-                            onClick={() => removeKeywordEntry(i, update)}
-                            variant="none"
-                            size="iconOnly"
-                            className={cl("delete")}>
-                            <DeleteIcon />
-                        </Button>
-                    </Flex>
-                    <FormSwitch
-                        value={values[i].ignoreCase}
-                        onChange={() => {
-                            setIgnoreCase(i, !values[i].ignoreCase);
-                        }}
-                        title="Ignore Case"
-                        className={cl("ignoreCaseSwitch")}
-                    />
-                    <FormSwitch
-                        value={values[i].ignoreBots ?? false}
-                        onChange={() => {
-                            setIgnoreBots(i, !values[i].ignoreBots);
-                        }}
-                        title="Ignore Bots"
-                        description="Ignore messages from bots"
-                        className={cl("ignoreCaseSwitch")}
-                    />
-                    <Flex flexDirection="row">
-                        <div style={{ flexGrow: 1 }}>
-                            <Heading tag="h5">Whitelist</Heading>
-                        </div>
-                        <Button onClick={() => {
-                            values[i].whitelist.push("");
-                            update();
-                        }}>Add ID</Button>
-                    </Flex>
-                    {!!values[i].whitelist.length && <>
-                        <div className={classes(Margins.top8, Margins.bottom8)} />
-                        <Flex flexDirection="row">
-                            <div style={{ flexGrow: 1 }}>
-                                <ListedIds listIds={values[i].whitelist} setListIds={e => setWhitelist(i, e)} />
-                            </div>
-                        </Flex>
-                    </>}
-                    <div className={classes(Margins.top8, Margins.bottom8)} />
-                    <Flex flexDirection="row">
-                        <div style={{ flexGrow: 1 }}>
-                            <Heading tag="h5">Blacklist</Heading>
-                        </div>
-                        <Button onClick={() => {
-                            values[i].blacklist.push("");
-                            update();
-                        }}>Add ID</Button>
-                    </Flex>
-                    {!!values[i].blacklist.length && <>
-                        <div className={classes(Margins.top8, Margins.bottom8)} />
-                        <Flex flexDirection="row">
-                            <div style={{ flexGrow: 1 }}>
-                                <ListedIds listIds={values[i].blacklist} setListIds={e => setBlacklist(i, e)} />
-                            </div>
-                        </Flex>
-                    </>}
-                    <div className={classes(Margins.top8, Margins.bottom8)} />
-                    <FormGenericLabel
-                        title="List priority"
-                        description="What list to prioritize in case a message triggers both lists"
-                        hideBorder
-                    >
-                        <ListPrioritySelector listType={values[i].listPriority} setListPriority={e => setListPriority(i, e)} />
-                    </FormGenericLabel>
-                </Collapsible>
-            </>
-        );
-    });
-
-    return (
-        <>
-            {elements}
-            <div><Button onClick={() => addKeywordEntry(update)}>Add Keyword Entry</Button></div>
-        </>
-    );
-}
-
-function Icon({
-    height = 24,
-    width = 24,
-    className,
-    children,
-    viewBox,
-    ...svgProps
-}: PropsWithChildren<BaseIconProps>) {
-    return (
-        <svg
-            className={classes(className, "vc-icon")}
-            role="img"
-            width={width}
-            height={height}
-            viewBox={viewBox}
-            {...svgProps}
-        >
-            {children}
-        </svg>
-    );
-}
-
-// Ideally I would just add this to Icons.tsx, but I cannot as this is a user-plugin :/
-function DoubleCheckmarkIcon(props: IconProps) {
-    // noinspection TypeScriptValidateTypes
-    return (
-        <Icon
-            {...props}
-            className={classes(props.className, "vc-double-checkmark-icon")}
-            viewBox="0 0 24 24"
-            width={16}
-            height={16}
-        >
-            <path fill="currentColor"
-                d="M16.7 8.7a1 1 0 0 0-1.4-1.4l-3.26 3.24a1 1 0 0 0 1.42 1.42L16.7 8.7ZM3.7 11.3a1 1 0 0 0-1.4 1.4l4.5 4.5a1 1 0 0 0 1.4-1.4l-4.5-4.5Z"
-            />
-            <path fill="currentColor"
-                d="M21.7 9.7a1 1 0 0 0-1.4-1.4L13 15.58l-3.3-3.3a1 1 0 0 0-1.4 1.42l4 4a1 1 0 0 0 1.4 0l8-8Z"
-            />
-        </Icon>
     );
 }
 
