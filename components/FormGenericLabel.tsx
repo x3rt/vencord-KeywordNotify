@@ -14,7 +14,7 @@ import type { ReactNode } from "react";
 
 import { cl as pluginCl } from "..";
 
-const cl = classNameFactory(pluginCl("form-generic-label-"));
+const cl = classNameFactory("vc-keywordnotify-form-generic-label-");
 
 interface FormGenericLabelProps {
     title: ReactNode;
