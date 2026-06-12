@@ -62,7 +62,7 @@ export async function addKeywordEntry(forceUpdate: () => void) {
         ignoreBots: true,
         whitelist: [],
         blacklist: [],
-        listPriority: ListType.Whitelist,
+        listPriority: ListType.Blacklist,
     });
     await DataStore.set(KEYWORD_ENTRIES_KEY, keywordEntries);
     forceUpdate();
@@ -198,7 +198,7 @@ export default definePlugin({
 
             if (entry.listType == null || entry.listIds == null) return;
 
-            entry.listPriority = entry.listType;
+            entry.listPriority = ListType.Blacklist;
             if (entry.listType === ListType.Whitelist) {
                 entry.whitelist = entry.listIds;
             } else {
