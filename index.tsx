@@ -33,7 +33,7 @@ import {
 } from "@webpack/common";
 import type { JSX, PropsWithChildren } from "react";
 
-import { FormGenericLabel } from "./components/FormGeneric";
+import { FormGenericLabel } from "./components/FormGenericLabel";
 
 
 type IconProps = JSX.IntrinsicElements["svg"];
@@ -62,7 +62,7 @@ const createMessageRecord = findByCodeLazy(".createFromServer(", ".isBlockedForM
 const KEYWORD_ENTRIES_KEY = "KeywordNotify_keywordEntries";
 const KEYWORD_LOG_KEY = "KeywordNotify_log";
 
-const cl = classNameFactory("vc-keywordnotify-");
+export const cl = classNameFactory("vc-keywordnotify-");
 
 async function addKeywordEntry(forceUpdate: () => void) {
     keywordEntries.push({
