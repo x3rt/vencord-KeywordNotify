@@ -133,7 +133,7 @@ export function KeywordEntries() {
                     <div className={classes(Margins.top8, Margins.bottom8)} />
                     <FormGenericLabel
                         title="List priority"
-                        description="What list to prioritize in case a message triggers both lists"
+                        description="What list to prioritize in case a message triggers both lists (in most common cases is Blacklist)"
                         hideBorder
                     >
                         <ListPrioritySelector listType={values[i].listPriority} setListPriority={e => setListPriority(i, e)} />
