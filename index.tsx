@@ -36,11 +36,11 @@ import type { JSX, PropsWithChildren } from "react";
 
 type IconProps = JSX.IntrinsicElements["svg"];
 interface KeywordEntry {
-    regex: string
-    listIds: string[]
-    listType: ListType
-    ignoreCase: boolean
-    ignoreBots?: boolean
+    regex: string;
+    listIds: string[];
+    listType: ListType;
+    ignoreCase: boolean;
+    ignoreBots?: boolean;
 }
 
 let keywordEntries: Array<KeywordEntry> = [];
@@ -224,7 +224,7 @@ function KeywordEntries() {
 
     async function setIgnoreBots(index: number, value: boolean) {
         keywordEntries[index].ignoreBots = value,
-        await DataStore.set(KEYWORD_ENTRIES_KEY, keywordEntries);
+            await DataStore.set(KEYWORD_ENTRIES_KEY, keywordEntries);
         update();
     }
 
@@ -360,7 +360,20 @@ const settings = definePluginSettings({
 
 export default definePlugin({
     name: "KeywordNotify",
-    authors: [{ name: "camila314", id: 738592270617542716n }, { name: "x3rt", id: 131602100332396544n }],
+    authors: [
+        {
+            name: "camila314",
+            id: 738592270617542716n,
+        },
+        {
+            name: "x3rt",
+            id: 131602100332396544n,
+        },
+        {
+            name: "benjas333",
+            id: 456577284464443394n,
+        },
+    ],
     description: "Sends a notification if a given message matches certain keywords or regexes",
     settings,
     patches: [
