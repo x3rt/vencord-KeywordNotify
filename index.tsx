@@ -33,14 +33,19 @@ import {
 } from "@webpack/common";
 import type { JSX, PropsWithChildren } from "react";
 
+import { FormGenericLabel } from "./components/FormGeneric";
+
 
 type IconProps = JSX.IntrinsicElements["svg"];
 interface KeywordEntry {
     regex: string;
-    listIds: string[];
-    listType: ListType;
+    listIds?: string[];
+    listType?: ListType;
     ignoreCase: boolean;
     ignoreBots?: boolean;
+    whitelist: string[];
+    blacklist: string[];
+    listPriority: ListType;
 }
 
 let keywordEntries: Array<KeywordEntry> = [];
@@ -60,7 +65,14 @@ const KEYWORD_LOG_KEY = "KeywordNotify_log";
 const cl = classNameFactory("vc-keywordnotify-");
 
 async function addKeywordEntry(forceUpdate: () => void) {
-    keywordEntries.push({ regex: "", listIds: [], listType: ListType.BlackList, ignoreCase: false, ignoreBots: true });
+    keywordEntries.push({
+        regex: "",
+        ignoreCase: false,
+        ignoreBots: true,
+        whitelist: [],
+        blacklist: [],
+        listPriority: ListType.Whitelist,
+    });
     await DataStore.set(KEYWORD_ENTRIES_KEY, keywordEntries);
     forceUpdate();
 }
@@ -134,7 +146,7 @@ function Collapsible({ title, children }) {
     );
 }
 
-function ListedIds({ listIds, setListIds }) {
+function ListedIds({ listIds, setListIds }: { listIds: string[], setListIds: (v: string[]) => void; }) {
     const update = useForceUpdater();
     const [values] = useState(listIds);
 
@@ -177,7 +189,7 @@ function ListedIds({ listIds, setListIds }) {
     );
 }
 
-function ListTypeSelector({ listType, setListType }: { listType: ListType, setListType: (v: ListType) => void; }) {
+function ListPrioritySelector({ listType, setListPriority }: { listType: ListType, setListPriority: (v: ListType) => void; }) {
     return (
         <Select
             options={[
@@ -187,7 +199,7 @@ function ListTypeSelector({ listType, setListType }: { listType: ListType, setLi
             placeholder={"Select a list type"}
             isSelected={v => v === listType}
             closeOnSelect={true}
-            select={setListType}
+            select={setListPriority}
             serialize={v => v}
         />
     );
@@ -197,35 +209,41 @@ function ListTypeSelector({ listType, setListType }: { listType: ListType, setLi
 function KeywordEntries() {
     const update = useForceUpdater();
     const [values] = useState(keywordEntries);
+    // const [entryType, setEntryType] = useState(ListType.Whitelist);
+
+    async function updateStoreAndRender() {
+        await DataStore.set(KEYWORD_ENTRIES_KEY, keywordEntries);
+        update();
+    }
 
     async function setRegex(index: number, value: string) {
         keywordEntries[index].regex = value;
-        await DataStore.set(KEYWORD_ENTRIES_KEY, keywordEntries);
-        update();
+        updateStoreAndRender();
     }
 
-    async function setListType(index: number, value: ListType) {
-        keywordEntries[index].listType = value;
-        await DataStore.set(KEYWORD_ENTRIES_KEY, keywordEntries);
-        update();
+    async function setListPriority(index: number, value: ListType) {
+        keywordEntries[index].listPriority = value;
+        updateStoreAndRender();
     }
 
-    async function setListIds(index: number, value: Array<string>) {
-        keywordEntries[index].listIds = value ?? [];
-        await DataStore.set(KEYWORD_ENTRIES_KEY, keywordEntries);
-        update();
+    async function setWhitelist(index: number, value: string[]) {
+        keywordEntries[index].whitelist = value;
+        updateStoreAndRender();
+    }
+
+    async function setBlacklist(index: number, value: string[]) {
+        keywordEntries[index].blacklist = value;
+        updateStoreAndRender();
     }
 
     async function setIgnoreCase(index: number, value: boolean) {
         keywordEntries[index].ignoreCase = value;
-        await DataStore.set(KEYWORD_ENTRIES_KEY, keywordEntries);
-        update();
+        updateStoreAndRender();
     }
 
     async function setIgnoreBots(index: number, value: boolean) {
         keywordEntries[index].ignoreBots = value,
-            await DataStore.set(KEYWORD_ENTRIES_KEY, keywordEntries);
-        update();
+            updateStoreAndRender();
     }
 
     const elements = keywordEntries.map((entry, i) => {
@@ -266,22 +284,49 @@ function KeywordEntries() {
                         description="Ignore messages from bots"
                         className={cl("ignoreCaseSwitch")}
                     />
-                    <Heading tag="h5">Whitelist/Blacklist</Heading>
                     <Flex flexDirection="row">
                         <div style={{ flexGrow: 1 }}>
-                            <ListedIds listIds={values[i].listIds} setListIds={e => setListIds(i, e)} />
+                            <Heading tag="h5">Whitelist</Heading>
                         </div>
-                    </Flex>
-                    <div className={[Margins.top8, Margins.bottom8].join(" ")} />
-                    <Flex flexDirection="row">
                         <Button onClick={() => {
-                            values[i].listIds.push("");
+                            values[i].whitelist.push("");
                             update();
                         }}>Add ID</Button>
-                        <div style={{ flexGrow: 1 }}>
-                            <ListTypeSelector listType={values[i].listType} setListType={e => setListType(i, e)} />
-                        </div>
                     </Flex>
+                    {!!values[i].whitelist.length && <>
+                        <div className={classes(Margins.top8, Margins.bottom8)} />
+                        <Flex flexDirection="row">
+                            <div style={{ flexGrow: 1 }}>
+                                <ListedIds listIds={values[i].whitelist} setListIds={e => setWhitelist(i, e)} />
+                            </div>
+                        </Flex>
+                    </>}
+                    <div className={classes(Margins.top8, Margins.bottom8)} />
+                    <Flex flexDirection="row">
+                        <div style={{ flexGrow: 1 }}>
+                            <Heading tag="h5">Blacklist</Heading>
+                        </div>
+                        <Button onClick={() => {
+                            values[i].blacklist.push("");
+                            update();
+                        }}>Add ID</Button>
+                    </Flex>
+                    {!!values[i].blacklist.length && <>
+                        <div className={classes(Margins.top8, Margins.bottom8)} />
+                        <Flex flexDirection="row">
+                            <div style={{ flexGrow: 1 }}>
+                                <ListedIds listIds={values[i].blacklist} setListIds={e => setBlacklist(i, e)} />
+                            </div>
+                        </Flex>
+                    </>}
+                    <div className={classes(Margins.top8, Margins.bottom8)} />
+                    <FormGenericLabel
+                        title="List priority"
+                        description="What list to prioritize in case a message triggers both lists"
+                        hideBorder
+                    >
+                        <ListPrioritySelector listType={values[i].listPriority} setListPriority={e => setListPriority(i, e)} />
+                    </FormGenericLabel>
                 </Collapsible>
             </>
         );
@@ -412,11 +457,30 @@ export default definePlugin({
 
     async start() {
         this.onUpdate = () => null;
+
         keywordEntries = await DataStore.get(KEYWORD_ENTRIES_KEY) ?? [];
-        // HACK: migration to add default ignoreBots value config per keyword
         // TODO: remove after a while
-        keywordEntries.forEach(entry => entry.ignoreBots = entry.ignoreBots ?? this.settings.store.ignoreBots);
+        keywordEntries.forEach(entry => {
+            // HACK: migration to add default ignoreBots value config per keyword
+            entry.ignoreBots = entry.ignoreBots ?? this.settings.store.ignoreBots;
+
+            // HACK: migration to the new whitelist and blacklist system
+            entry.whitelist = entry.whitelist ?? [];
+            entry.blacklist = entry.blacklist ?? [];
+
+            if (entry.listType == null || entry.listIds == null) return;
+
+            entry.listPriority = entry.listType;
+            if (entry.listType === ListType.Whitelist) {
+                entry.whitelist = entry.listIds;
+            } else {
+                entry.blacklist = entry.listIds;
+            }
+            delete entry.listIds;
+            delete entry.listType;
+        });
         await DataStore.set(KEYWORD_ENTRIES_KEY, keywordEntries);
+
         (await DataStore.get(KEYWORD_LOG_KEY) ?? []).map(e => JSON.parse(e)).forEach(e => {
             try {
                 this.addToLog(e);
@@ -445,24 +509,45 @@ export default definePlugin({
                 continue;
             }
 
-            let listed = entry.listIds.some(id => id.trim() === m.channel_id || id === m.author.id);
-            if (!listed) {
+            let isInWhitelist = entry.whitelist.some(id => {
+                const trimmed = id.trim();
+                return trimmed === m.channel_id || trimmed === m.author.id;
+            });
+            if (!isInWhitelist) {
                 const channel = ChannelStore.getChannel(m.channel_id);
                 if (channel != null) {
-                    listed = entry.listIds.some(id => id.trim() === channel.guild_id);
+                    isInWhitelist = entry.whitelist.some(id => id.trim() === channel.guild_id);
                 }
             }
 
-            const whitelistMode = entry.listType === ListType.Whitelist;
-
-            if (!whitelistMode && listed) {
-                continue;
+            let isInBlacklist = entry.blacklist.some(id => {
+                const trimmed = id.trim();
+                return trimmed === m.channel_id || trimmed === m.author.id;
+            });
+            if (!isInBlacklist) {
+                const channel = ChannelStore.getChannel(m.channel_id);
+                if (channel != null) {
+                    isInBlacklist = entry.whitelist.some(id => id.trim() === channel.guild_id);
+                }
             }
-            if (whitelistMode && !listed) {
-                continue;
+
+            const isWhitelistPrioritized = entry.listPriority === ListType.Whitelist;
+
+            if (isInWhitelist && isInBlacklist) {
+                if (!isWhitelistPrioritized) {
+                    continue;
+                }
+            } else {
+                if (entry.whitelist.length && !isInWhitelist) {
+                    continue;
+                }
+
+                if (isInBlacklist) {
+                    continue;
+                }
             }
 
-            if (entry.ignoreBots && m.author.bot && (!whitelistMode || !entry.listIds.includes(m.author.id))) {
+            if (m.author.bot && entry.ignoreBots && (!entry.whitelist.length || !entry.whitelist.includes(m.author.id))) {
                 continue;
             }
 
