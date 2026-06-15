@@ -11,6 +11,7 @@ import { FormSwitch } from "@components/FormSwitch";
 import { Heading } from "@components/Heading";
 import { DeleteIcon } from "@components/Icons";
 import { Margins } from "@components/margins";
+import { Paragraph } from "@components/Paragraph";
 import { classes } from "@utils/misc";
 import { useForceUpdater } from "@utils/react";
 import { TextInput, useState } from "@webpack/common";
@@ -132,8 +133,15 @@ export function KeywordEntries() {
                     </>}
                     <div className={classes(Margins.top8, Margins.bottom8)} />
                     <FormGenericLabel
-                        title="List priority"
-                        description="What list to prioritize in case a message triggers both lists (in most common cases is Blacklist)"
+                        title="List priority (Advanced)"
+                        description={<>
+                            <Paragraph>
+                                Which list to prioritize in case a message triggers both lists
+                            </Paragraph>
+                            <Paragraph>
+                                If you are not sure, in most common scenarios it is usually set to Blacklist
+                            </Paragraph>
+                        </>}
                         hideBorder
                     >
                         <ListPrioritySelector listType={values[i].listPriority} setListPriority={e => setListPriority(i, e)} />

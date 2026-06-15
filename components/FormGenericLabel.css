@@ -10,6 +10,7 @@
     > :last-child {
         margin-left: auto;
         max-width: fit-content;
+        min-width: fit-content;
     }
 }
 
