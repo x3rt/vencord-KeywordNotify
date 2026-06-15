@@ -195,10 +195,10 @@ export default definePlugin({
             // HACK: migration to the new whitelist and blacklist system
             entry.whitelist = entry.whitelist ?? [];
             entry.blacklist = entry.blacklist ?? [];
+            entry.listPriority = entry.listPriority ?? ListType.BlackList;
 
             if (entry.listType == null || entry.listIds == null) return;
 
-            entry.listPriority = ListType.BlackList;
             if (entry.listType === ListType.Whitelist) {
                 entry.whitelist = entry.listIds;
             } else {
