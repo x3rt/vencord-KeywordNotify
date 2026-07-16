@@ -156,29 +156,24 @@ export default definePlugin({
             replacement: [
                 {
                     match: /,(?:(?:\i&&)?\i\?\(0,\i\.jsxs?\)\(\i\.\i\.Item)/,
-                    replace: ",$self.keywordTabBar()$&"
+                    replace: ",$self.keywordTabBar()$&",
                 },
                 {
                     match: /:(\i)===\i\.\i\.MENTIONS\?\(0,.{0,500}null}/,
-                    replace: ": $1 === 8 ? $self.keywordClearButton() $&"
+                    replace: ": $1 === 8 ? $self.keywordClearButton() $&",
                 },
                 {
                     match: /:(\i)===\i\.\i\.MENTIONS\?\(0,.{0,500}onJump:(\i)}\)/,
-                    replace: ": $1 === 8 ? $self.tryKeywordMenu($2) $&"
-                }
-            ]
-        },
-        {
-            find: ".guildFilter:null",
-            replacement: [
+                    replace: ": $1 === 8 ? $self.tryKeywordMenu($2) $&",
+                },
                 {
                     match: /function (\i)\(\i\){let{message:\i,gotoMessage/,
-                    replace: "$self.renderMsg = $1; $&"
+                    replace: "$self.renderMsg = $1; $&",
                 },
                 {
                     match: /onClick:\(\)=>(\i\.\i\.deleteRecentMention\((\i)\.id\))/,
-                    replace: "onClick: () => $2._keyword ? $self.deleteKeyword($2.id) : $1"
-                }
+                    replace: "onClick: () => $2._keyword ? $self.deleteKeyword($2.id) : $1",
+                },
             ]
         },
     ],
