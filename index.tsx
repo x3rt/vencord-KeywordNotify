@@ -12,17 +12,19 @@ import { Button } from "@components/Button";
 import { classNameFactory } from "@utils/css";
 import { classes } from "@utils/misc";
 import definePlugin, { OptionType } from "@utils/types";
-import { Message } from "@vencord/discord-types";
+import { Message, ScrollerBaseRef } from "@vencord/discord-types";
 import { findByCodeLazy, findCssClassesLazy } from "@webpack";
 import {
     ChannelStore,
     FluxDispatcher,
-    SelectedChannelStore,
+    ScrollerThin,
     TabBar,
     Tooltip,
+    useRef,
     UserStore,
     useState
 } from "@webpack/common";
+import type { JSX, RefObject } from "react";
 
 import { DoubleCheckmarkIcon } from "./components/Icons";
 import { KeywordEntries } from "./components/KeywordEntries";
@@ -40,15 +42,32 @@ interface KeywordEntry {
 }
 
 export let keywordEntries: Array<KeywordEntry> = [];
-let keywordLog: Array<any> = [];
+let keywordLog: Array<Message> = [];
 let interceptor: (e: any) => void;
 
+interface ScrollerContext {
+    id: string;
+    onKeyDown: () => void;
+    orientation: string;
+    ref: RefObject<unknown>;
+    tabIndex: number;
+}
+
+interface ScrollerOpts {
+    role: string;
+    tabIndex: ScrollerContext["tabIndex"];
+    "data-list-id": ScrollerContext["id"];
+    onKeyDown: ScrollerContext["onKeyDown"];
+    ref: ScrollerContext["ref"];
+    "aria-orientation": ScrollerContext["orientation"];
+}
 
 const recentMentionsPopoutClass = findCssClassesLazy("recentMentionsPopout", "scroller");
 const tabClass = findCssClassesLazy("inboxTitle", "tab");
 
-// const MenuHeader = findByCodeLazy(".getUnseenInviteCount())");
-const Popout = findByCodeLazy("getProTip", "canCloseAllMessages:");
+const PopoutContainer = findByCodeLazy("navigator", "Provider");
+const getMessageScrollerOptions: () => ScrollerOpts = findByCodeLazy("onKeyDown", "tabIndex", "useContext", "aria-orientation");
+const createNavigator = findByCodeLazy("keyboardModeEnabled)", "scrollIntoViewNode");
 const createMessageRecord = findByCodeLazy(".createFromServer(", ".isBlockedForMessage", "messageReference:");
 export const KEYWORD_ENTRIES_KEY = "KeywordNotify_keywordEntries";
 const KEYWORD_LOG_KEY = "KeywordNotify_log";
@@ -151,7 +170,7 @@ export default definePlugin({
     settings,
     patches: [
         {
-            find: "#{intl::UNREADS_TAB_LABEL})}",
+            find: "#{intl::MENTIONS})",
             group: true,
             replacement: [
                 {
@@ -167,8 +186,8 @@ export default definePlugin({
                     replace: ": $1 === 8 ? $self.tryKeywordMenu($2) $&",
                 },
                 {
-                    match: /function (\i)\(\i\){let{message:\i,gotoMessage/,
-                    replace: "$self.renderMsg = $1; $&",
+                    match: /function (\i)\(\i\){let{message:\i,onJump/,
+                    replace: "$self.RenderMsg = $1; $&",
                 },
                 {
                     match: /onClick:\(\)=>(\i\.\i\.deleteRecentMention\((\i)\.id\))/,
@@ -344,7 +363,7 @@ export default definePlugin({
         }
 
         keywordLog.push(thing);
-        keywordLog.sort((a, b) => b.timestamp - a.timestamp);
+        keywordLog.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
 
         while (keywordLog.length > settings.store.amountToKeep) {
             keywordLog.pop();
@@ -388,50 +407,52 @@ export default definePlugin({
     },
 
     tryKeywordMenu(onJump) {
-        const channel = ChannelStore.getChannel(SelectedChannelStore.getChannelId());
-
         const [tempLogs, setKeywordLog] = useState(keywordLog);
+        const navigatorScrollerRef = useRef<ScrollerBaseRef | null>(null);
+
+        const navigator = createNavigator("keywords", navigatorScrollerRef);
+
         this.onUpdate = () => {
             const newLog = Array.from(keywordLog);
             setKeywordLog(newLog);
         };
 
-        const messageRender = (e, t) => {
-            e._keyword = true;
+        const RenderMsgWrapper = (message: Message & { _keyword?: boolean; }): JSX.Element => {
+            message._keyword = true;
 
-            e.customRenderedContent = {
-                content: highlightKeywords(e.content, keywordEntries)
+            message.customRenderedContent = {
+                content: highlightKeywords(message.content, keywordEntries)
             };
 
-            const msg = this.renderMsg({
-                message: e,
-                gotoMessage: t,
-                dismissible: true
+            return this.RenderMsg({
+                message,
+                onJump,
             });
+        };
 
-            return [msg];
+        const MessageScrollerHelper = ({ children }: { children: (scrollerOpts: ScrollerOpts) => JSX.Element; }) => {
+            return children(getMessageScrollerOptions());
         };
 
         return (
-            <>
-                <Popout
-                    className={classes(recentMentionsPopoutClass.recentMentionsPopout)}
-                    scrollerClassName={classes(recentMentionsPopoutClass.scroller)}
-                    renderHeader={() => null}
-                    renderMessage={messageRender}
-                    channel={channel}
-                    onJump={onJump}
-                    onFetch={() => null}
-                    onCloseMessage={(id: string) => {
-                        this.deleteKeyword(id);
-                        this.discardMessage(id);
+            <PopoutContainer navigator={navigator}>
+                <MessageScrollerHelper>
+                    {({ ref, ...restOpts }) => {
+                        return <ScrollerThin
+                            ref={thinScrollerRef => {
+                                navigatorScrollerRef.current = thinScrollerRef;
+                                // @ts-ignore
+                                ref.current = thinScrollerRef?.getScrollerNode() ?? null;
+                            }}
+                            className={classes(recentMentionsPopoutClass.scroller)}
+                            onScroll={void 0}
+                            {...restOpts}
+                        >
+                            {tempLogs.map(m => <div key={m.id}>{RenderMsgWrapper(m)}</div>)}
+                        </ScrollerThin>;
                     }}
-                    loadMore={() => null}
-                    messages={tempLogs}
-                    renderEmptyState={() => null}
-                    canCloseAllMessages={true}
-                />
-            </>
+                </MessageScrollerHelper>
+            </PopoutContainer>
         );
     },
 
