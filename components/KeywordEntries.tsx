@@ -22,38 +22,38 @@ import { ListedIds } from "./ListedIds";
 import { ListPrioritySelector } from "./ListPrioritySelector";
 
 export function KeywordEntries() {
-    const { keywordsList: values } = settings.use(["keywordsList"]);
+    const { keywordEntries: values } = settings.use(["keywordEntries"]);
     async function updateStoreAndRender() {
-        await DataStore.set(KEYWORD_ENTRIES_KEY, settings.store.keywordsList);
+        await DataStore.set(KEYWORD_ENTRIES_KEY, settings.store.keywordEntries);
     }
 
     async function setRegex(index: number, value: string) {
-        settings.store.keywordsList[index].regex = value;
+        settings.store.keywordEntries[index].regex = value;
         updateStoreAndRender();
     }
 
     async function setListPriority(index: number, value: ListType) {
-        settings.store.keywordsList[index].listPriority = value;
+        settings.store.keywordEntries[index].listPriority = value;
         updateStoreAndRender();
     }
 
     async function setWhitelist(index: number, value: string[]) {
-        settings.store.keywordsList[index].whitelist = value;
+        settings.store.keywordEntries[index].whitelist = value;
         updateStoreAndRender();
     }
 
     async function setBlacklist(index: number, value: string[]) {
-        settings.store.keywordsList[index].blacklist = value;
+        settings.store.keywordEntries[index].blacklist = value;
         updateStoreAndRender();
     }
 
     async function setIgnoreCase(index: number, value: boolean) {
-        settings.store.keywordsList[index].ignoreCase = value;
+        settings.store.keywordEntries[index].ignoreCase = value;
         updateStoreAndRender();
     }
 
     async function setIgnoreBots(index: number, value: boolean) {
-        settings.store.keywordsList[index].ignoreBots = value,
+        settings.store.keywordEntries[index].ignoreBots = value,
             updateStoreAndRender();
     }
 
