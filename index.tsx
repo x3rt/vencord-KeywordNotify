@@ -42,7 +42,6 @@ interface KeywordEntry {
     listPriority: ListType;
 }
 
-// export let keywordEntries: Array<KeywordEntry> = [];
 let keywordLog: Array<Message> = [];
 let interceptor: (e: any) => void;
 

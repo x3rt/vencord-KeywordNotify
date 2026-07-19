@@ -22,13 +22,9 @@ import { ListedIds } from "./ListedIds";
 import { ListPrioritySelector } from "./ListPrioritySelector";
 
 export function KeywordEntries() {
-    // const update = useForceUpdater();
-    // const [values] = useState(keywordEntries);
     const { keywordsList: values } = settings.use(["keywordsList"]);
-    // const [entryType, setEntryType] = useState(ListType.Whitelist);
     async function updateStoreAndRender() {
         await DataStore.set(KEYWORD_ENTRIES_KEY, settings.store.keywordsList);
-        // update();
     }
 
     async function setRegex(index: number, value: string) {
