@@ -115,7 +115,6 @@ export function KeywordEntries() {
                         </div>
                         <Button onClick={() => {
                             entry.blacklist.push("");
-                            // update();
                         }}>Add ID</Button>
                     </Flex>
                     {!!entry.blacklist.length && <>
