@@ -13,55 +13,55 @@ import { DeleteIcon } from "@components/Icons";
 import { Margins } from "@components/margins";
 import { Paragraph } from "@components/Paragraph";
 import { classes } from "@utils/misc";
-import { useForceUpdater } from "@utils/react";
-import { TextInput, useState } from "@webpack/common";
+import { TextInput } from "@webpack/common";
 
-import { addKeywordEntry, cl, KEYWORD_ENTRIES_KEY, keywordEntries, ListType, removeKeywordEntry } from "..";
+import { addKeywordEntry, cl, KEYWORD_ENTRIES_KEY, ListType, removeKeywordEntry, settings } from "..";
 import { Collapsible } from "./Collapsible";
 import { FormGenericLabel } from "./FormGenericLabel";
 import { ListedIds } from "./ListedIds";
 import { ListPrioritySelector } from "./ListPrioritySelector";
 
 export function KeywordEntries() {
-    const update = useForceUpdater();
-    const [values] = useState(keywordEntries);
+    // const update = useForceUpdater();
+    // const [values] = useState(keywordEntries);
+    const { keywordsList: values } = settings.use(["keywordsList"]);
     // const [entryType, setEntryType] = useState(ListType.Whitelist);
     async function updateStoreAndRender() {
-        await DataStore.set(KEYWORD_ENTRIES_KEY, keywordEntries);
-        update();
+        await DataStore.set(KEYWORD_ENTRIES_KEY, settings.store.keywordsList);
+        // update();
     }
 
     async function setRegex(index: number, value: string) {
-        keywordEntries[index].regex = value;
+        settings.store.keywordsList[index].regex = value;
         updateStoreAndRender();
     }
 
     async function setListPriority(index: number, value: ListType) {
-        keywordEntries[index].listPriority = value;
+        settings.store.keywordsList[index].listPriority = value;
         updateStoreAndRender();
     }
 
     async function setWhitelist(index: number, value: string[]) {
-        keywordEntries[index].whitelist = value;
+        settings.store.keywordsList[index].whitelist = value;
         updateStoreAndRender();
     }
 
     async function setBlacklist(index: number, value: string[]) {
-        keywordEntries[index].blacklist = value;
+        settings.store.keywordsList[index].blacklist = value;
         updateStoreAndRender();
     }
 
     async function setIgnoreCase(index: number, value: boolean) {
-        keywordEntries[index].ignoreCase = value;
+        settings.store.keywordsList[index].ignoreCase = value;
         updateStoreAndRender();
     }
 
     async function setIgnoreBots(index: number, value: boolean) {
-        keywordEntries[index].ignoreBots = value,
+        settings.store.keywordsList[index].ignoreBots = value,
             updateStoreAndRender();
     }
 
-    const elements = keywordEntries.map((entry, i) => {
+    const elements = values.map((entry, i) => {
         return (
             <>
                 <Collapsible title={`Keyword Entry ${i + 1}`}>
@@ -70,11 +70,11 @@ export function KeywordEntries() {
                             <TextInput
                                 placeholder="example|regex"
                                 spellCheck={false}
-                                value={values[i].regex}
+                                value={entry.regex}
                                 onChange={e => setRegex(i, e)} />
                         </div>
                         <Button
-                            onClick={() => removeKeywordEntry(i, update)}
+                            onClick={() => removeKeywordEntry(i)}
                             variant="none"
                             size="iconOnly"
                             className={cl("delete")}>
@@ -82,16 +82,16 @@ export function KeywordEntries() {
                         </Button>
                     </Flex>
                     <FormSwitch
-                        value={values[i].ignoreCase}
+                        value={entry.ignoreCase}
                         onChange={() => {
-                            setIgnoreCase(i, !values[i].ignoreCase);
+                            setIgnoreCase(i, !entry.ignoreCase);
                         }}
                         title="Ignore Case"
                         className={cl("ignoreCaseSwitch")} />
                     <FormSwitch
-                        value={values[i].ignoreBots ?? false}
+                        value={entry.ignoreBots ?? false}
                         onChange={() => {
-                            setIgnoreBots(i, !values[i].ignoreBots);
+                            setIgnoreBots(i, !entry.ignoreBots);
                         }}
                         title="Ignore Bots"
                         description="Ignore messages from bots"
@@ -101,15 +101,15 @@ export function KeywordEntries() {
                             <Heading tag="h5">Whitelist</Heading>
                         </div>
                         <Button onClick={() => {
-                            values[i].whitelist.push("");
-                            update();
+                            entry.whitelist.push("");
+                            // update();
                         }}>Add ID</Button>
                     </Flex>
-                    {!!values[i].whitelist.length && <>
+                    {!!entry.whitelist.length && <>
                         <div className={classes(Margins.top8, Margins.bottom8)} />
                         <Flex flexDirection="row">
                             <div style={{ flexGrow: 1 }}>
-                                <ListedIds listIds={values[i].whitelist} setListIds={e => setWhitelist(i, e)} />
+                                <ListedIds listIds={entry.whitelist} setListIds={e => setWhitelist(i, e)} />
                             </div>
                         </Flex>
                     </>}
@@ -119,15 +119,15 @@ export function KeywordEntries() {
                             <Heading tag="h5">Blacklist</Heading>
                         </div>
                         <Button onClick={() => {
-                            values[i].blacklist.push("");
-                            update();
+                            entry.blacklist.push("");
+                            // update();
                         }}>Add ID</Button>
                     </Flex>
-                    {!!values[i].blacklist.length && <>
+                    {!!entry.blacklist.length && <>
                         <div className={classes(Margins.top8, Margins.bottom8)} />
                         <Flex flexDirection="row">
                             <div style={{ flexGrow: 1 }}>
-                                <ListedIds listIds={values[i].blacklist} setListIds={e => setBlacklist(i, e)} />
+                                <ListedIds listIds={entry.blacklist} setListIds={e => setBlacklist(i, e)} />
                             </div>
                         </Flex>
                     </>}
@@ -144,7 +144,7 @@ export function KeywordEntries() {
                         </>}
                         hideBorder
                     >
-                        <ListPrioritySelector listType={values[i].listPriority} setListPriority={e => setListPriority(i, e)} />
+                        <ListPrioritySelector listType={entry.listPriority} setListPriority={e => setListPriority(i, e)} />
                     </FormGenericLabel>
                 </Collapsible>
             </>
@@ -154,7 +154,7 @@ export function KeywordEntries() {
     return (
         <>
             {elements}
-            <div><Button onClick={() => addKeywordEntry(update)}>Add Keyword Entry</Button></div>
+            <div><Button onClick={() => addKeywordEntry()}>Add Keyword Entry</Button></div>
         </>
     );
 }
