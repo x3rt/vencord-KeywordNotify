@@ -9,11 +9,13 @@ import "./style.css";
 import { DataStore } from "@api/index";
 import { definePluginSettings } from "@api/Settings";
 import { Button } from "@components/Button";
+import ErrorBoundary from "@components/ErrorBoundary";
 import { classNameFactory } from "@utils/css";
+import { proxyLazy } from "@utils/lazy";
 import { classes } from "@utils/misc";
 import definePlugin, { OptionType } from "@utils/types";
 import { Message, ScrollerBaseRef } from "@vencord/discord-types";
-import { findByCodeLazy, findCssClassesLazy } from "@webpack";
+import { findByCodeLazy, findCssClasses, findCssClassesLazy } from "@webpack";
 import {
     ChannelStore,
     FluxDispatcher,
@@ -62,7 +64,36 @@ interface ScrollerOpts {
     "aria-orientation": ScrollerContext["orientation"];
 }
 
-const recentMentionsPopoutClass = findCssClassesLazy("recentMentionsPopout", "scroller");
+enum ReleaseChannels {
+    // CANARY_RELEASE = "canaryRelease",
+    // BETA_RELEASE = "betaRelease",
+    // GOOGLE_RELEASE = "googleRelease",
+    CANARY = "canary",
+    PTB = "ptb",
+    STABLE = "stable",
+    // ADHOC = "adhoc",
+    // STAGING = "staging",
+    // DEVELOPMENT = "development",
+    // N_A = "N/A",
+}
+
+function findCssClassesByReleaseChannelLazy<S extends string>(
+    opts:
+        & { [ReleaseChannels.STABLE]: S[] }
+        & Partial<Record<ReleaseChannels, S[]>>
+) {
+    return proxyLazy(() => {
+        const RELEASE_CHANNEL = window.GLOBAL_ENV.RELEASE_CHANNEL as ReleaseChannels | undefined ?? ReleaseChannels.STABLE;
+        const classes = opts[RELEASE_CHANNEL] ?? opts[ReleaseChannels.STABLE];
+
+        return findCssClasses(...classes);
+    });
+}
+
+const scrollerClass = findCssClassesByReleaseChannelLazy({
+    stable: ["recentMentionsPopout", "scroller"],
+    canary: ["singleMessage", "scroller"],
+});
 const tabClass = findCssClassesLazy("inboxTitle", "tab");
 
 const PopoutContainer = findByCodeLazy("navigator", "Provider");
@@ -435,24 +466,26 @@ export default definePlugin({
         };
 
         return (
-            <PopoutContainer navigator={navigator}>
-                <MessageScrollerHelper>
-                    {({ ref, ...restOpts }) => {
-                        return <ScrollerThin
-                            ref={thinScrollerRef => {
-                                navigatorScrollerRef.current = thinScrollerRef;
-                                // @ts-ignore
-                                ref.current = thinScrollerRef?.getScrollerNode() ?? null;
-                            }}
-                            className={classes(recentMentionsPopoutClass.scroller)}
-                            onScroll={void 0}
-                            {...restOpts}
-                        >
-                            {tempLogs.map(m => <div key={m.id}>{RenderMsgWrapper(m)}</div>)}
-                        </ScrollerThin>;
-                    }}
-                </MessageScrollerHelper>
-            </PopoutContainer>
+            <ErrorBoundary>
+                <PopoutContainer navigator={navigator}>
+                    <MessageScrollerHelper>
+                        {({ ref, ...restOpts }) => {
+                            return <ScrollerThin
+                                ref={thinScrollerRef => {
+                                    navigatorScrollerRef.current = thinScrollerRef;
+                                    // @ts-ignore
+                                    ref.current = thinScrollerRef?.getScrollerNode() ?? null;
+                                }}
+                                className={classes(scrollerClass.scroller)}
+                                onScroll={void 0}
+                                {...restOpts}
+                            >
+                                {tempLogs.map(m => <div key={m.id}>{RenderMsgWrapper(m)}</div>)}
+                            </ScrollerThin>;
+                        }}
+                    </MessageScrollerHelper>
+                </PopoutContainer>
+            </ErrorBoundary>
         );
     },
 
