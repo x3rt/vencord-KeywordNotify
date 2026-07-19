@@ -98,7 +98,6 @@ export function KeywordEntries() {
                         </div>
                         <Button onClick={() => {
                             entry.whitelist.push("");
-                            // update();
                         }}>Add ID</Button>
                     </Flex>
                     {!!entry.whitelist.length && <>
