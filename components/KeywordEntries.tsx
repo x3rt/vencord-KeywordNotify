@@ -22,7 +22,7 @@ import { ListedIds } from "./ListedIds";
 import { ListPrioritySelector } from "./ListPrioritySelector";
 
 export function KeywordEntries() {
-    const { keywordEntries: values } = settings.use(["keywordEntries"]);
+    const { keywordEntries } = settings.use(["keywordEntries"]);
     async function updateStoreAndRender() {
         await DataStore.set(KEYWORD_ENTRIES_KEY, settings.store.keywordEntries);
     }
@@ -57,7 +57,7 @@ export function KeywordEntries() {
             updateStoreAndRender();
     }
 
-    const elements = values.map((entry, i) => {
+    const elements = keywordEntries.map((entry, i) => {
         return (
             <>
                 <Collapsible title={`Keyword Entry ${i + 1}`}>
