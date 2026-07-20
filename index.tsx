@@ -42,7 +42,6 @@ interface KeywordEntry {
     listPriority: ListType;
 }
 
-export let keywordEntries: Array<KeywordEntry> = [];
 let keywordLog: Array<Message> = [];
 let interceptor: (e: any) => void;
 
@@ -75,8 +74,8 @@ const KEYWORD_LOG_KEY = "KeywordNotify_log";
 
 export const cl = classNameFactory("vc-keywordnotify-");
 
-export async function addKeywordEntry(forceUpdate: () => void) {
-    keywordEntries.push({
+export async function addKeywordEntry() {
+    settings.store.keywordEntries.push({
         regex: "",
         ignoreCase: false,
         ignoreBots: true,
@@ -84,14 +83,12 @@ export async function addKeywordEntry(forceUpdate: () => void) {
         blacklist: [],
         listPriority: ListType.BlackList,
     });
-    await DataStore.set(KEYWORD_ENTRIES_KEY, keywordEntries);
-    forceUpdate();
+    await DataStore.set(KEYWORD_ENTRIES_KEY, settings.store.keywordEntries);
 }
 
-export async function removeKeywordEntry(idx: number, forceUpdate: () => void) {
-    keywordEntries.splice(idx, 1);
-    await DataStore.set(KEYWORD_ENTRIES_KEY, keywordEntries);
-    forceUpdate();
+export async function removeKeywordEntry(idx: number) {
+    settings.store.keywordEntries.splice(idx, 1);
+    await DataStore.set(KEYWORD_ENTRIES_KEY, settings.store.keywordEntries);
 }
 
 function safeMatchesRegex(str: string, regex: string, flags: string) {
@@ -131,7 +128,7 @@ function highlightKeywords(str: string, entries: Array<KeywordEntry>) {
     );
 }
 
-const settings = definePluginSettings({
+export const settings = definePluginSettings({
     // TODO: remove when the migration snippet on async start() is removed
     ignoreBots: {
         type: OptionType.BOOLEAN,
@@ -144,11 +141,15 @@ const settings = definePluginSettings({
         description: "Amount of messages to keep in the log",
         default: 50
     },
-    keywords: {
+    keywordsComponent: {
         type: OptionType.COMPONENT,
         description: "Manage keywords",
         component: () => <KeywordEntries />
-    }
+    },
+    keywordEntries: {
+        type: OptionType.CUSTOM,
+        default: [] as KeywordEntry[],
+    },
 });
 
 export default definePlugin({
@@ -201,9 +202,11 @@ export default definePlugin({
     async start() {
         this.onUpdate = () => null;
 
-        keywordEntries = await DataStore.get(KEYWORD_ENTRIES_KEY) ?? [];
+        if (!settings.store.keywordEntries.length) {
+            settings.store.keywordEntries = await DataStore.get(KEYWORD_ENTRIES_KEY) ?? [];
+        }
         // TODO: remove after a while
-        keywordEntries.forEach(entry => {
+        settings.store.keywordEntries.forEach(entry => {
             // HACK: migration to add default ignoreBots value config per keyword
             entry.ignoreBots = entry.ignoreBots ?? this.settings.store.ignoreBots;
 
@@ -222,7 +225,7 @@ export default definePlugin({
             delete entry.listIds;
             delete entry.listType;
         });
-        await DataStore.set(KEYWORD_ENTRIES_KEY, keywordEntries);
+        await DataStore.set(KEYWORD_ENTRIES_KEY, settings.store.keywordEntries);
 
         (await DataStore.get(KEYWORD_LOG_KEY) ?? []).map(e => JSON.parse(e)).forEach(e => {
             try {
@@ -247,7 +250,7 @@ export default definePlugin({
     applyKeywordEntries(m: Message) {
         let matches = false;
 
-        for (const entry of keywordEntries) {
+        for (const entry of settings.store.keywordEntries) {
             if (entry.regex === "") {
                 continue;
             }
@@ -422,7 +425,7 @@ export default definePlugin({
             message._keyword = true;
 
             message.customRenderedContent = {
-                content: highlightKeywords(message.content, keywordEntries)
+                content: highlightKeywords(message.content, settings.store.keywordEntries)
             };
 
             return this.RenderMsg({
