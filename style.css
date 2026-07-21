@@ -8,7 +8,7 @@
     color: var(--status-danger);
 }
 
-.vc-keywordnotify-ignoreCaseSwitch {
+.vc-keywordnotify-genericSwitch {
     margin-top: 0.5em;
     margin-right: 40px;
 }

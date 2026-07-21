@@ -23,38 +23,44 @@ import { ListPrioritySelector } from "./ListPrioritySelector";
 
 export function KeywordEntries() {
     const { keywordEntries } = settings.use(["keywordEntries"]);
+
     async function updateStoreAndRender() {
         await DataStore.set(KEYWORD_ENTRIES_KEY, settings.store.keywordEntries);
     }
 
     async function setRegex(index: number, value: string) {
         settings.store.keywordEntries[index].regex = value;
-        updateStoreAndRender();
+        await updateStoreAndRender();
     }
 
     async function setListPriority(index: number, value: ListType) {
         settings.store.keywordEntries[index].listPriority = value;
-        updateStoreAndRender();
+        await updateStoreAndRender();
     }
 
     async function setWhitelist(index: number, value: string[]) {
         settings.store.keywordEntries[index].whitelist = value;
-        updateStoreAndRender();
+        await updateStoreAndRender();
     }
 
     async function setBlacklist(index: number, value: string[]) {
         settings.store.keywordEntries[index].blacklist = value;
-        updateStoreAndRender();
+        await updateStoreAndRender();
+    }
+
+    async function setEnabled(index: number, value: boolean) {
+        settings.store.keywordEntries[index].enabled = value;
+        await updateStoreAndRender();
     }
 
     async function setIgnoreCase(index: number, value: boolean) {
         settings.store.keywordEntries[index].ignoreCase = value;
-        updateStoreAndRender();
+        await updateStoreAndRender();
     }
 
     async function setIgnoreBots(index: number, value: boolean) {
-        settings.store.keywordEntries[index].ignoreBots = value,
-            updateStoreAndRender();
+        settings.store.keywordEntries[index].ignoreBots = value;
+        await updateStoreAndRender();
     }
 
     const elements = keywordEntries.map((entry, i) => {
@@ -78,12 +84,19 @@ export function KeywordEntries() {
                         </Button>
                     </Flex>
                     <FormSwitch
+                        value={entry.enabled}
+                        onChange={() => {
+                            setEnabled(i, !entry.enabled);
+                        }}
+                        title="Enabled?"
+                        className={cl("genericSwitch")} />
+                    <FormSwitch
                         value={entry.ignoreCase}
                         onChange={() => {
                             setIgnoreCase(i, !entry.ignoreCase);
                         }}
                         title="Ignore Case"
-                        className={cl("ignoreCaseSwitch")} />
+                        className={cl("genericSwitch")} />
                     <FormSwitch
                         value={entry.ignoreBots ?? false}
                         onChange={() => {
@@ -91,7 +104,7 @@ export function KeywordEntries() {
                         }}
                         title="Ignore Bots"
                         description="Ignore messages from bots"
-                        className={cl("ignoreCaseSwitch")} />
+                        className={cl("genericSwitch")} />
                     <Flex flexDirection="row">
                         <div style={{ flexGrow: 1 }}>
                             <Heading tag="h5">Whitelist</Heading>

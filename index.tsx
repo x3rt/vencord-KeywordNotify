@@ -32,11 +32,10 @@ import { KeywordEntries } from "./components/KeywordEntries";
 
 
 interface KeywordEntry {
+    enabled: boolean;
     regex: string;
-    listIds?: string[];
-    listType?: ListType;
     ignoreCase: boolean;
-    ignoreBots?: boolean;
+    ignoreBots: boolean;
     whitelist: string[];
     blacklist: string[];
     listPriority: ListType;
@@ -76,6 +75,7 @@ export const cl = classNameFactory("vc-keywordnotify-");
 
 export async function addKeywordEntry() {
     settings.store.keywordEntries.push({
+        enabled: true,
         regex: "",
         ignoreCase: false,
         ignoreBots: true,
@@ -129,13 +129,6 @@ function highlightKeywords(str: string, entries: Array<KeywordEntry>) {
 }
 
 export const settings = definePluginSettings({
-    // TODO: remove when the migration snippet on async start() is removed
-    ignoreBots: {
-        type: OptionType.BOOLEAN,
-        description: "Ignore messages from bots",
-        default: true,
-        hidden: true,
-    },
     amountToKeep: {
         type: OptionType.NUMBER,
         description: "Amount of messages to keep in the log",
@@ -205,25 +198,8 @@ export default definePlugin({
         if (!settings.store.keywordEntries.length) {
             settings.store.keywordEntries = await DataStore.get(KEYWORD_ENTRIES_KEY) ?? [];
         }
-        // TODO: remove after a while
         settings.store.keywordEntries.forEach(entry => {
-            // HACK: migration to add default ignoreBots value config per keyword
-            entry.ignoreBots = entry.ignoreBots ?? this.settings.store.ignoreBots;
-
-            // HACK: migration to the new whitelist and blacklist system
-            entry.whitelist = entry.whitelist ?? [];
-            entry.blacklist = entry.blacklist ?? [];
-            entry.listPriority = entry.listPriority ?? ListType.BlackList;
-
-            if (entry.listType == null || entry.listIds == null) return;
-
-            if (entry.listType === ListType.Whitelist) {
-                entry.whitelist = entry.listIds;
-            } else {
-                entry.blacklist = entry.listIds;
-            }
-            delete entry.listIds;
-            delete entry.listType;
+            entry.enabled = entry.enabled ?? true;
         });
         await DataStore.set(KEYWORD_ENTRIES_KEY, settings.store.keywordEntries);
 
@@ -251,7 +227,7 @@ export default definePlugin({
         let matches = false;
 
         for (const entry of settings.store.keywordEntries) {
-            if (entry.regex === "") {
+            if (!entry.enabled || entry.regex === "") {
                 continue;
             }
 
