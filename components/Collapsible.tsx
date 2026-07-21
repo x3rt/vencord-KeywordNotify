@@ -19,7 +19,8 @@ export function Collapsible({ title, children }) {
         <div>
             <TextButton
                 onClick={() => setIsOpen(!isOpen)}
-                className={cl("collapsible")}>
+                className={cl("collapsible")}
+            >
                 <div style={{ display: "flex", alignItems: "center" }}>
                     <div style={{
                         marginLeft: "auto",

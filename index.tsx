@@ -7,9 +7,11 @@
 import "./style.css";
 
 import { DataStore } from "@api/index";
+import { plugins } from "@api/PluginManager";
 import { definePluginSettings } from "@api/Settings";
 import { Button } from "@components/Button";
 import ErrorBoundary from "@components/ErrorBoundary";
+import { openPluginModal } from "@components/settings/tabs/plugins/PluginModal";
 import { classNameFactory } from "@utils/css";
 import { classes } from "@utils/misc";
 import definePlugin, { OptionType } from "@utils/types";
@@ -31,19 +33,6 @@ import { DoubleCheckmarkIcon } from "./components/Icons";
 import { KeywordEntries } from "./components/KeywordEntries";
 
 
-interface KeywordEntry {
-    enabled: boolean;
-    regex: string;
-    ignoreCase: boolean;
-    ignoreBots: boolean;
-    whitelist: string[];
-    blacklist: string[];
-    listPriority: ListType;
-}
-
-let keywordLog: Array<Message> = [];
-let interceptor: (e: any) => void;
-
 interface ScrollerContext {
     id: string;
     onKeyDown: () => void;
@@ -63,15 +52,35 @@ interface ScrollerOpts {
 
 const scrollerClass = findCssClassesLazy("singleMessage", "scroller");
 const tabClass = findCssClassesLazy("inboxTitle", "tab");
-
 const PopoutContainer = findByCodeLazy("navigator", "Provider");
 const getMessageScrollerOptions: () => ScrollerOpts = findByCodeLazy("onKeyDown", "tabIndex", "useContext", "aria-orientation");
 const createNavigator = findByCodeLazy("keyboardModeEnabled)", "scrollIntoViewNode");
 const createMessageRecord = findByCodeLazy(".createFromServer(", ".isBlockedForMessage", "messageReference:");
+
+
 export const KEYWORD_ENTRIES_KEY = "KeywordNotify_keywordEntries";
 const KEYWORD_LOG_KEY = "KeywordNotify_log";
 
 export const cl = classNameFactory("vc-keywordnotify-");
+
+let keywordLog: Message[] = [];
+let interceptor: (e: any) => void;
+
+
+interface KeywordEntry {
+    enabled: boolean;
+    regex: string;
+    ignoreCase: boolean;
+    ignoreBots: boolean;
+    whitelist: string[];
+    blacklist: string[];
+    listPriority: ListType;
+}
+
+export enum ListType {
+    BlackList = "BlackList",
+    Whitelist = "Whitelist"
+}
 
 export async function addKeywordEntry() {
     settings.store.keywordEntries.push({
@@ -83,12 +92,12 @@ export async function addKeywordEntry() {
         blacklist: [],
         listPriority: ListType.BlackList,
     });
-    await DataStore.set(KEYWORD_ENTRIES_KEY, settings.store.keywordEntries);
+    await DataStore.set(KEYWORD_ENTRIES_KEY, settings.plain.keywordEntries);
 }
 
 export async function removeKeywordEntry(idx: number) {
     settings.store.keywordEntries.splice(idx, 1);
-    await DataStore.set(KEYWORD_ENTRIES_KEY, settings.store.keywordEntries);
+    await DataStore.set(KEYWORD_ENTRIES_KEY, settings.plain.keywordEntries);
 }
 
 function safeMatchesRegex(str: string, regex: string, flags: string) {
@@ -99,20 +108,15 @@ function safeMatchesRegex(str: string, regex: string, flags: string) {
     }
 }
 
-export enum ListType {
-    BlackList = "BlackList",
-    Whitelist = "Whitelist"
-}
-
-function highlightKeywords(str: string, entries: Array<KeywordEntry>) {
-    let regexes: Array<RegExp>;
+function highlightKeywords(str: string, entries: KeywordEntry[]) {
+    let regexes: RegExp[];
     try {
         regexes = entries.map(e => new RegExp(e.regex, "g" + (e.ignoreCase ? "i" : "")));
     } catch (err) {
         return [str];
     }
 
-    const matches = regexes.map(r => str.match(r)).flat().filter(e => e != null) as Array<string>;
+    const matches = regexes.map(r => str.match(r)).flat().filter(e => e != null) as string[];
     if (matches.length === 0) {
         return [str];
     }
@@ -132,12 +136,12 @@ export const settings = definePluginSettings({
     amountToKeep: {
         type: OptionType.NUMBER,
         description: "Amount of messages to keep in the log",
-        default: 50
+        default: 50,
     },
     keywordsComponent: {
         type: OptionType.COMPONENT,
         description: "Manage keywords",
-        component: () => <KeywordEntries />
+        component: () => <KeywordEntries />,
     },
     keywordEntries: {
         type: OptionType.CUSTOM,
@@ -191,6 +195,11 @@ export default definePlugin({
             ]
         },
     ],
+    toolboxActions: {
+        async "Open Plugin Settings"() {
+            openPluginModal(plugins.KeywordNotify);
+        }
+    },
 
     async start() {
         this.onUpdate = () => null;
@@ -201,7 +210,7 @@ export default definePlugin({
         settings.store.keywordEntries.forEach(entry => {
             entry.enabled = entry.enabled ?? true;
         });
-        await DataStore.set(KEYWORD_ENTRIES_KEY, settings.store.keywordEntries);
+        await DataStore.set(KEYWORD_ENTRIES_KEY, settings.plain.keywordEntries);
 
         (await DataStore.get(KEYWORD_LOG_KEY) ?? []).map(e => JSON.parse(e)).forEach(e => {
             try {
@@ -216,6 +225,7 @@ export default definePlugin({
         };
         FluxDispatcher.addInterceptor(interceptor);
     },
+
     stop() {
         const index = FluxDispatcher._interceptors.indexOf(interceptor);
         if (index > -1) {
@@ -223,13 +233,9 @@ export default definePlugin({
         }
     },
 
-    applyKeywordEntries(m: Message) {
-        let matches = false;
-
+    doesMatchAnyKeyword(m: Message): boolean {
         for (const entry of settings.store.keywordEntries) {
-            if (!entry.enabled || entry.regex === "") {
-                continue;
-            }
+            if (!entry.enabled || entry.regex === "") continue;
 
             let isInWhitelist = entry.whitelist.some(id => {
                 const trimmed = id.trim();
@@ -256,17 +262,11 @@ export default definePlugin({
             const isWhitelistPrioritized = entry.listPriority === ListType.Whitelist;
 
             if (isInWhitelist && isInBlacklist) {
-                if (!isWhitelistPrioritized) {
-                    continue;
-                }
+                if (!isWhitelistPrioritized) continue;
             } else {
-                if (entry.whitelist.length && !isInWhitelist) {
-                    continue;
-                }
+                if (entry.whitelist.length && !isInWhitelist) continue;
 
-                if (isInBlacklist) {
-                    continue;
-                }
+                if (isInBlacklist) continue;
             }
 
             if (m.author.bot && entry.ignoreBots && (!entry.whitelist.length || !entry.whitelist.includes(m.author.id))) {
@@ -275,66 +275,71 @@ export default definePlugin({
 
             const flags = entry.ignoreCase ? "i" : "";
             if (safeMatchesRegex(m.content, entry.regex, flags)) {
-                matches = true;
-            } else {
-                for (const embed of m.embeds as any) {
-                    if (safeMatchesRegex(embed.description, entry.regex, flags) || safeMatchesRegex(embed.title, entry.regex, flags)) {
-                        matches = true;
-                        break;
-                    } else if (embed.fields != null) {
-                        for (const field of embed.fields as Array<{ name: string, value: string; }>) {
-                            if (safeMatchesRegex(field.value, entry.regex, flags) || safeMatchesRegex(field.name, entry.regex, flags)) {
-                                matches = true;
-                                break;
-                            }
-                        }
+                return true;
+            }
+
+            for (const embed of m.embeds as any) {
+                if (safeMatchesRegex(embed.description, entry.regex, flags) || safeMatchesRegex(embed.title, entry.regex, flags)) {
+                    return true;
+                }
+
+                if (embed.fields == null) continue;
+
+                for (const field of embed.fields) {
+                    if (safeMatchesRegex(field.value, entry.regex, flags) || safeMatchesRegex(field.name, entry.regex, flags)) {
+                        return true;
                     }
                 }
             }
         }
 
-        if (matches) {
-            const id = UserStore.getCurrentUser()?.id;
-            if (id != null) {
-                // @ts-ignore
-                m.mentions.push({ id: id });
-            }
+        return false;
+    },
 
-            if (m.author.id !== id) {
-                this.storeMessage(m);
-                this.addToLog(m);
-            }
+    applyKeywordEntries(m: Message) {
+        if (!this.doesMatchAnyKeyword(m)) return;
+
+        const id = UserStore.getCurrentUser()?.id;
+        if (id != null) {
+            // @ts-ignore
+            m.mentions.push({ id });
+        }
+
+        if (m.author.id !== id) {
+            this.storeMessage(m);
+            this.addToLog(m);
         }
     },
+
     storeMessage(m: Message) {
-        if (m == null)
-            return;
+        if (m == null) return;
 
-        DataStore.get(KEYWORD_LOG_KEY).then(log => {
-            log = log ? log.map((e: string) => JSON.parse(e)) : [];
+        DataStore.get<string[]>(KEYWORD_LOG_KEY).then(log => {
+            let parsed_logs = log?.map(e => JSON.parse(e) as Message) ?? [];
 
-            log.push(m);
-            if (log.length > settings.store.amountToKeep) {
-                log = log.slice(-settings.store.amountToKeep);
+            parsed_logs.push(m);
+            if (parsed_logs.length > settings.store.amountToKeep) {
+                parsed_logs = parsed_logs.slice(-settings.store.amountToKeep);
             }
 
-            DataStore.set(KEYWORD_LOG_KEY, log.map(e => JSON.stringify(e)));
+            DataStore.set(KEYWORD_LOG_KEY, parsed_logs.map(e => JSON.stringify(e)));
         });
     },
+
     discardMessage(id: string) {
-        DataStore.get(KEYWORD_LOG_KEY).then((log: string[]) => {
-            let parsed_logs: Message[] = log ? log.map(e => JSON.parse(e)) : [];
+        DataStore.get<string[]>(KEYWORD_LOG_KEY).then(log => {
+            let parsed_logs = log?.map(e => JSON.parse(e) as Message) ?? [];
 
             parsed_logs = parsed_logs.filter(msg => msg.id !== id);
 
             DataStore.set(KEYWORD_LOG_KEY, parsed_logs.map(e => JSON.stringify(e)));
         });
     },
-    addToLog(m: Message) {
-        if (m == null || keywordLog.some(e => e.id === m.id))
-            return;
 
-        let thing: any;
+    addToLog(m: Message) {
+        if (m == null || keywordLog.some(e => e.id === m.id)) return;
+
+        let thing: Message;
         try {
             thing = createMessageRecord(m);
         } catch (err) {
@@ -352,7 +357,7 @@ export default definePlugin({
         this.onUpdate();
     },
 
-    deleteKeyword(id) {
+    deleteKeyword(id: string) {
         keywordLog = keywordLog.filter(e => e.id !== id);
         this.onUpdate();
     },
@@ -386,7 +391,7 @@ export default definePlugin({
         );
     },
 
-    tryKeywordMenu(onJump) {
+    tryKeywordMenu(onJump: () => void) {
         const [tempLogs, setKeywordLog] = useState(keywordLog);
         const navigatorScrollerRef = useRef<ScrollerBaseRef | null>(null);
 
@@ -438,7 +443,7 @@ export default definePlugin({
         );
     },
 
-    modify(e) {
+    modify(e: any) {
         if (e.type === "MESSAGE_CREATE" || e.type === "MESSAGE_UPDATE") {
             this.applyKeywordEntries(e.message);
         } else if (e.type === "LOAD_MESSAGES_SUCCESS") {
@@ -446,5 +451,5 @@ export default definePlugin({
                 this.applyKeywordEntries(e.messages[msg]);
             }
         }
-    }
+    },
 });

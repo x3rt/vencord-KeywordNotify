@@ -14,7 +14,12 @@ interface BaseIconProps extends IconProps {
 }
 
 function Icon({
-    height = 24, width = 24, className, children, viewBox, ...svgProps
+    height = 24,
+    width = 24,
+    className,
+    children,
+    viewBox,
+    ...svgProps
 }: PropsWithChildren<BaseIconProps>) {
     return (
         <svg
