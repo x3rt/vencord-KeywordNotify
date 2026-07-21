@@ -52,7 +52,7 @@ interface ScrollerOpts {
 
 const scrollerClass = findCssClassesLazy("singleMessage", "scroller");
 const tabClass = findCssClassesLazy("inboxTitle", "tab");
-const PopoutContainer = findByCodeLazy("navigator", "Provider");
+const PopoutContainer = findByCodeLazy("navigator", "containerProps");
 const getMessageScrollerOptions: () => ScrollerOpts = findByCodeLazy("onKeyDown", "tabIndex", "useContext", "aria-orientation");
 const createNavigator = findByCodeLazy("keyboardModeEnabled)", "scrollIntoViewNode");
 const createMessageRecord = findByCodeLazy(".createFromServer(", ".isBlockedForMessage", "messageReference:");
