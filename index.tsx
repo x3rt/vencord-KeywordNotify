@@ -31,6 +31,7 @@ import type { JSX, RefObject } from "react";
 
 import { DoubleCheckmarkIcon } from "./components/Icons";
 import { KeywordEntries } from "./components/KeywordEntries";
+import { KeywordEntry, ListType, MessageJsonFixed } from "./types";
 
 
 interface ScrollerContext {
@@ -56,6 +57,7 @@ const PopoutContainer = findByCodeLazy("navigator", "containerProps");
 const getMessageScrollerOptions: () => ScrollerOpts = findByCodeLazy("onKeyDown", "tabIndex", "useContext", "aria-orientation");
 const createNavigator = findByCodeLazy("keyboardModeEnabled)", "scrollIntoViewNode");
 const createMessageRecord = findByCodeLazy(".createFromServer(", ".isBlockedForMessage", "messageReference:");
+const useScrollerEvents: (ref: RefObject<unknown>) => void = findByCodeLazy("scrollPageUp", "subscribe");
 
 
 export const KEYWORD_ENTRIES_KEY = "KeywordNotify_keywordEntries";
@@ -66,21 +68,6 @@ export const cl = classNameFactory("vc-keywordnotify-");
 let keywordLog: Message[] = [];
 let interceptor: (e: any) => void;
 
-
-interface KeywordEntry {
-    enabled: boolean;
-    regex: string;
-    ignoreCase: boolean;
-    ignoreBots: boolean;
-    whitelist: string[];
-    blacklist: string[];
-    listPriority: ListType;
-}
-
-export enum ListType {
-    BlackList = "BlackList",
-    Whitelist = "Whitelist"
-}
 
 export async function addKeywordEntry() {
     settings.store.keywordEntries.push({
@@ -182,7 +169,7 @@ export default definePlugin({
                 },
                 {
                     match: /:(\i)===\i\.\i\.MENTIONS\?\(0,.{0,500}onJump:(\i)}\)/,
-                    replace: ": $1 === 8 ? $self.tryKeywordMenu($2) $&",
+                    replace: ": $1 === 8 ? $self.tryKeywordMenu({ onJump: $2}) $&",
                 },
                 {
                     match: /function (\i)\(\i\){let{message:\i,onJump/,
@@ -204,15 +191,30 @@ export default definePlugin({
     async start() {
         this.onUpdate = () => null;
 
+        // TODO: remove migration
+        // store migration
         if (!settings.store.keywordEntries.length) {
             settings.store.keywordEntries = await DataStore.get(KEYWORD_ENTRIES_KEY) ?? [];
         }
+        // sort and duplicated migration fix
+        DataStore.get<string[]>(KEYWORD_LOG_KEY).then(log => {
+            let parsed_logs = log?.map(e => JSON.parse(e) as MessageJsonFixed) ?? [];
+
+            parsed_logs = parsed_logs.toSorted((a, b) => b.timestamp.localeCompare(a.timestamp));
+
+            parsed_logs = [...new Map(parsed_logs.map(e => [e.id, e])).values()];
+
+            DataStore.set(KEYWORD_LOG_KEY, parsed_logs.map(e => JSON.stringify(e)));
+        });
+        // add enabled param migration
         settings.store.keywordEntries.forEach(entry => {
             entry.enabled = entry.enabled ?? true;
         });
+
+        // NOTE: consider removing DataStore for KEYWORD_ENTRIES_KEY at all
         await DataStore.set(KEYWORD_ENTRIES_KEY, settings.plain.keywordEntries);
 
-        (await DataStore.get(KEYWORD_LOG_KEY) ?? []).map(e => JSON.parse(e)).forEach(e => {
+        (await DataStore.get<string[]>(KEYWORD_LOG_KEY) ?? []).map(e => JSON.parse(e) as MessageJsonFixed).forEach(e => {
             try {
                 this.addToLog(e);
             } catch (err) {
@@ -233,7 +235,7 @@ export default definePlugin({
         }
     },
 
-    doesMatchAnyKeyword(m: Message): boolean {
+    doesMatchAnyKeyword(m: MessageJsonFixed): boolean {
         for (const entry of settings.store.keywordEntries) {
             if (!entry.enabled || entry.regex === "") continue;
 
@@ -255,14 +257,13 @@ export default definePlugin({
             if (!isInBlacklist) {
                 const channel = ChannelStore.getChannel(m.channel_id);
                 if (channel != null) {
-                    isInBlacklist = entry.whitelist.some(id => id.trim() === channel.guild_id);
+                    isInBlacklist = entry.blacklist.some(id => id.trim() === channel.guild_id);
                 }
             }
 
-            const isWhitelistPrioritized = entry.listPriority === ListType.Whitelist;
 
             if (isInWhitelist && isInBlacklist) {
-                if (!isWhitelistPrioritized) continue;
+                if (entry.listPriority === ListType.BlackList) continue;
             } else {
                 if (entry.whitelist.length && !isInWhitelist) continue;
 
@@ -278,7 +279,7 @@ export default definePlugin({
                 return true;
             }
 
-            for (const embed of m.embeds as any) {
+            for (const embed of m.embeds) {
                 if (safeMatchesRegex(embed.description, entry.regex, flags) || safeMatchesRegex(embed.title, entry.regex, flags)) {
                     return true;
                 }
@@ -296,30 +297,40 @@ export default definePlugin({
         return false;
     },
 
-    applyKeywordEntries(m: Message) {
+    applyKeywordEntries(m: MessageJsonFixed) {
         if (!this.doesMatchAnyKeyword(m)) return;
 
-        const id = UserStore.getCurrentUser()?.id;
-        if (id != null) {
-            // @ts-ignore
-            m.mentions.push({ id });
+        const user = UserStore.getCurrentUser();
+        if (user != null) {
+            m.mentions.push({
+                id: user.id,
+                avatar: user.avatar,
+                avatarDecoration: user.avatarDecoration,
+                discriminator: user.discriminator,
+                globalName: user.globalName,
+                publicFlags: user.publicFlags,
+                username: user.username,
+            });
         }
 
-        if (m.author.id !== id) {
+        if (m.author.id !== user?.id) {
             this.storeMessage(m);
             this.addToLog(m);
         }
     },
 
-    storeMessage(m: Message) {
+    storeMessage(m: MessageJsonFixed) {
         if (m == null) return;
 
         DataStore.get<string[]>(KEYWORD_LOG_KEY).then(log => {
-            let parsed_logs = log?.map(e => JSON.parse(e) as Message) ?? [];
+            let parsed_logs = log?.map(e => JSON.parse(e) as MessageJsonFixed) ?? [];
+            if (parsed_logs.some(e => e.id === m.id)) return;
 
             parsed_logs.push(m);
-            if (parsed_logs.length > settings.store.amountToKeep) {
-                parsed_logs = parsed_logs.slice(-settings.store.amountToKeep);
+            parsed_logs = parsed_logs.toSorted((a, b) => b.timestamp.localeCompare(a.timestamp));
+
+            while (parsed_logs.length > settings.store.amountToKeep) {
+                parsed_logs.pop();
             }
 
             DataStore.set(KEYWORD_LOG_KEY, parsed_logs.map(e => JSON.stringify(e)));
@@ -328,7 +339,7 @@ export default definePlugin({
 
     discardMessage(id: string) {
         DataStore.get<string[]>(KEYWORD_LOG_KEY).then(log => {
-            let parsed_logs = log?.map(e => JSON.parse(e) as Message) ?? [];
+            let parsed_logs = log?.map(e => JSON.parse(e) as MessageJsonFixed) ?? [];
 
             parsed_logs = parsed_logs.filter(msg => msg.id !== id);
 
@@ -336,7 +347,7 @@ export default definePlugin({
         });
     },
 
-    addToLog(m: Message) {
+    addToLog(m: MessageJsonFixed) {
         if (m == null || keywordLog.some(e => e.id === m.id)) return;
 
         let thing: Message;
@@ -359,6 +370,7 @@ export default definePlugin({
 
     deleteKeyword(id: string) {
         keywordLog = keywordLog.filter(e => e.id !== id);
+
         this.onUpdate();
     },
 
@@ -382,6 +394,7 @@ export default definePlugin({
                         onClick={() => {
                             keywordLog = [];
                             DataStore.set(KEYWORD_LOG_KEY, []);
+
                             this.onUpdate();
                         }}>
                         <DoubleCheckmarkIcon />
@@ -391,11 +404,13 @@ export default definePlugin({
         );
     },
 
-    tryKeywordMenu(onJump: () => void) {
+    tryKeywordMenu({ onJump }: { onJump: () => void; }) {
         const [tempLogs, setKeywordLog] = useState(keywordLog);
         const navigatorScrollerRef = useRef<ScrollerBaseRef | null>(null);
 
         const navigator = createNavigator("keywords", navigatorScrollerRef);
+
+        useScrollerEvents(navigatorScrollerRef);
 
         this.onUpdate = () => {
             const newLog = Array.from(keywordLog);

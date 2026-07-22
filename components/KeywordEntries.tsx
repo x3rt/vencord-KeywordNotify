@@ -15,7 +15,8 @@ import { Paragraph } from "@components/Paragraph";
 import { classes } from "@utils/misc";
 import { TextInput } from "@webpack/common";
 
-import { addKeywordEntry, cl, KEYWORD_ENTRIES_KEY, ListType, removeKeywordEntry, settings } from "..";
+import { addKeywordEntry, cl, KEYWORD_ENTRIES_KEY, removeKeywordEntry, settings } from "..";
+import { ListType } from "../types";
 import { Collapsible } from "./Collapsible";
 import { FormGenericLabel } from "./FormGenericLabel";
 import { ListedIds } from "./ListedIds";

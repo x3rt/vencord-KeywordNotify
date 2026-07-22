@@ -6,7 +6,7 @@
 
 import { Select } from "@webpack/common";
 
-import { ListType } from "..";
+import { ListType } from "../types";
 
 export function ListPrioritySelector({ listType, setListPriority }: { listType: ListType; setListPriority: (v: ListType) => void; }) {
     return (
