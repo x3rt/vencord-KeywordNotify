@@ -54,7 +54,6 @@ interface ScrollerOpts {
 const scrollerClass = findCssClassesLazy("singleMessage", "scroller");
 const tabClass = findCssClassesLazy("inboxTitle", "tab");
 const PopoutContainer = findByCodeLazy("navigator", "containerProps");
-const getMessageScrollerOptions: () => ScrollerOpts = findByCodeLazy("onKeyDown", "tabIndex", "useContext", "aria-orientation");
 const createNavigator = findByCodeLazy("keyboardModeEnabled)", "scrollIntoViewNode");
 const createMessageRecord = findByCodeLazy(".createFromServer(", ".isBlockedForMessage", "messageReference:");
 const useScrollerEvents: (ref: RefObject<unknown>) => void = findByCodeLazy("scrollPageUp", "subscribe");
@@ -62,6 +61,7 @@ const useScrollerEvents: (ref: RefObject<unknown>) => void = findByCodeLazy("scr
 
 export const KEYWORD_ENTRIES_KEY = "KeywordNotify_keywordEntries";
 const KEYWORD_LOG_KEY = "KeywordNotify_log";
+const TAB_ID = 333;
 
 export const cl = classNameFactory("vc-keywordnotify-");
 
@@ -165,11 +165,11 @@ export default definePlugin({
                 },
                 {
                     match: /:(\i)===\i\.\i\.MENTIONS\?\(0,.{0,500}null}/,
-                    replace: ": $1 === 8 ? $self.keywordClearButton() $&",
+                    replace: `: $1 === ${TAB_ID} ? $self.keywordClearButton() $&`,
                 },
                 {
                     match: /:(\i)===\i\.\i\.MENTIONS\?\(0,.{0,500}onJump:(\i)}\)/,
-                    replace: ": $1 === 8 ? $self.tryKeywordMenu({ onJump: $2}) $&",
+                    replace: `: $1 === ${TAB_ID} ? $self.tryKeywordMenu({ onJump: $2}) $&`,
                 },
                 {
                     match: /function (\i)\(\i\){let{message:\i,onJump/,
@@ -177,7 +177,7 @@ export default definePlugin({
                 },
                 {
                     match: /onClick:\(\)=>(\i\.\i\.deleteRecentMention\((\i)\.id\))/,
-                    replace: "onClick: () => $2._keyword ? $self.deleteKeyword($2.id) : $1",
+                    replace: "onClick: () => $2._keyword ? $self.deleteMessageHelper($2.id) : $1",
                 },
             ]
         },
@@ -314,8 +314,7 @@ export default definePlugin({
         }
 
         if (m.author.id !== user?.id) {
-            this.storeMessage(m);
-            this.addToLog(m);
+            this.addMessageHelper(m);
         }
     },
 
@@ -324,9 +323,16 @@ export default definePlugin({
 
         DataStore.get<string[]>(KEYWORD_LOG_KEY).then(log => {
             let parsed_logs = log?.map(e => JSON.parse(e) as MessageJsonFixed) ?? [];
-            if (parsed_logs.some(e => e.id === m.id)) return;
 
-            parsed_logs.push(m);
+            const repeatedIndex = parsed_logs.findIndex(e => e.id === m.id);
+            if (repeatedIndex < 0) {
+                parsed_logs.push(m);
+            } else {
+                const repeatedMessage = parsed_logs[repeatedIndex];
+                if (repeatedMessage.edited_timestamp === m.edited_timestamp) return;
+
+                parsed_logs[repeatedIndex] = m;
+            }
             parsed_logs = parsed_logs.toSorted((a, b) => b.timestamp.localeCompare(a.timestamp));
 
             while (parsed_logs.length > settings.store.amountToKeep) {
@@ -348,17 +354,26 @@ export default definePlugin({
     },
 
     addToLog(m: MessageJsonFixed) {
-        if (m == null || keywordLog.some(e => e.id === m.id)) return;
+        if (m == null) return;
 
-        let thing: Message;
+        let messageRecord: Message;
         try {
-            thing = createMessageRecord(m);
+            messageRecord = createMessageRecord(m);
         } catch (err) {
             console.error(err);
             return;
         }
 
-        keywordLog.push(thing);
+        const repeatedIndex = keywordLog.findIndex(e => e.id === messageRecord.id);
+        if (repeatedIndex < 0) {
+            keywordLog.push(messageRecord);
+        } else {
+            const repeatedMessage = keywordLog[repeatedIndex];
+            if (repeatedMessage.editedTimestamp === messageRecord.editedTimestamp) return;
+
+            keywordLog[repeatedIndex] = messageRecord;
+        }
+
         keywordLog.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
 
         while (keywordLog.length > settings.store.amountToKeep) {
@@ -368,15 +383,25 @@ export default definePlugin({
         this.onUpdate();
     },
 
-    deleteKeyword(id: string) {
+    deleteFromLog(id: string) {
         keywordLog = keywordLog.filter(e => e.id !== id);
 
         this.onUpdate();
     },
 
+    addMessageHelper(m: MessageJsonFixed) {
+        this.storeMessage(m);
+        this.addToLog(m);
+    },
+
+    deleteMessageHelper(id: string) {
+        this.discardMessage(id);
+        this.deleteFromLog(id);
+    },
+
     keywordTabBar() {
         return (
-            <TabBar.Item className={classes(tabClass.tab)} id={8}>
+            <TabBar.Item className={classes(tabClass.tab)} id={TAB_ID}>
                 Keywords
             </TabBar.Item>
         );
@@ -430,29 +455,16 @@ export default definePlugin({
             });
         };
 
-        const MessageScrollerHelper = ({ children }: { children: (scrollerOpts: ScrollerOpts) => JSX.Element; }) => {
-            return children(getMessageScrollerOptions());
-        };
-
         return (
             <ErrorBoundary>
                 <PopoutContainer navigator={navigator}>
-                    <MessageScrollerHelper>
-                        {({ ref, ...restOpts }) => {
-                            return <ScrollerThin
-                                ref={thinScrollerRef => {
-                                    navigatorScrollerRef.current = thinScrollerRef;
-                                    // @ts-ignore
-                                    ref.current = thinScrollerRef?.getScrollerNode() ?? null;
-                                }}
-                                className={classes(scrollerClass.scroller)}
-                                onScroll={void 0}
-                                {...restOpts}
-                            >
-                                {tempLogs.map(m => <div key={m.id}>{RenderMsgWrapper(m)}</div>)}
-                            </ScrollerThin>;
-                        }}
-                    </MessageScrollerHelper>
+                    <ScrollerThin
+                        ref={navigatorScrollerRef}
+                        className={classes(scrollerClass.scroller)}
+                        onScroll={void 0}
+                    >
+                        {tempLogs.map(m => <div key={m.id}>{RenderMsgWrapper(m)}</div>)}
+                    </ScrollerThin>
                 </PopoutContainer>
             </ErrorBoundary>
         );
