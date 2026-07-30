@@ -34,23 +34,6 @@ import { KeywordEntries } from "./components/KeywordEntries";
 import { KeywordEntry, ListType, MessageJsonFixed } from "./types";
 
 
-interface ScrollerContext {
-    id: string;
-    onKeyDown: () => void;
-    orientation: string;
-    ref: RefObject<unknown>;
-    tabIndex: number;
-}
-
-interface ScrollerOpts {
-    role: string;
-    tabIndex: ScrollerContext["tabIndex"];
-    "data-list-id": ScrollerContext["id"];
-    onKeyDown: ScrollerContext["onKeyDown"];
-    ref: ScrollerContext["ref"];
-    "aria-orientation": ScrollerContext["orientation"];
-}
-
 const scrollerClass = findCssClassesLazy("singleMessage", "scroller");
 const tabClass = findCssClassesLazy("inboxTitle", "tab");
 const PopoutContainer = findByCodeLazy("navigator", "containerProps");
