@@ -117,6 +117,14 @@ export const settings = definePluginSettings({
         type: OptionType.CUSTOM,
         default: [] as KeywordEntry[],
     },
+
+    // XXX: Deprecated config
+    ignoreBots: {
+        type: OptionType.BOOLEAN,
+        description: "Ignore messages from bots",
+        default: true,
+        hidden: true,
+    },
 });
 
 export default definePlugin({
@@ -174,28 +182,7 @@ export default definePlugin({
     async start() {
         this.onUpdate = () => null;
 
-        // TODO: remove migration
-        // store migration
-        if (!settings.store.keywordEntries.length) {
-            settings.store.keywordEntries = await DataStore.get(KEYWORD_ENTRIES_KEY) ?? [];
-        }
-        // sort and duplicated migration fix
-        DataStore.get<string[]>(KEYWORD_LOG_KEY).then(log => {
-            let parsed_logs = log?.map(e => JSON.parse(e) as MessageJsonFixed) ?? [];
-
-            parsed_logs = parsed_logs.toSorted((a, b) => b.timestamp.localeCompare(a.timestamp));
-
-            parsed_logs = [...new Map(parsed_logs.map(e => [e.id, e])).values()];
-
-            DataStore.set(KEYWORD_LOG_KEY, parsed_logs.map(e => JSON.stringify(e)));
-        });
-        // add enabled param migration
-        settings.store.keywordEntries.forEach(entry => {
-            entry.enabled = entry.enabled ?? true;
-        });
-
-        // NOTE: consider removing DataStore for KEYWORD_ENTRIES_KEY at all
-        await DataStore.set(KEYWORD_ENTRIES_KEY, settings.plain.keywordEntries);
+        await this.applyMigrations();
 
         (await DataStore.get<string[]>(KEYWORD_LOG_KEY) ?? []).map(e => JSON.parse(e) as MessageJsonFixed).forEach(e => {
             try {
@@ -216,6 +203,54 @@ export default definePlugin({
         if (index > -1) {
             FluxDispatcher._interceptors.splice(index, 1);
         }
+    },
+
+    async applyMigrations() {
+        // TODO: remove migration
+
+        // store migration
+        if (!settings.store.keywordEntries.length) {
+            settings.store.keywordEntries = await DataStore.get(KEYWORD_ENTRIES_KEY) ?? [];
+        }
+
+        // sort and duplicated migration
+        DataStore.get<string[]>(KEYWORD_LOG_KEY).then(log => {
+            let parsed_logs = log?.map(e => JSON.parse(e) as MessageJsonFixed) ?? [];
+
+            parsed_logs = parsed_logs.toSorted((a, b) => b.timestamp.localeCompare(a.timestamp));
+
+            parsed_logs = [...new Map(parsed_logs.map(e => [e.id, e])).values()];
+
+            DataStore.set(KEYWORD_LOG_KEY, parsed_logs.map(e => JSON.stringify(e)));
+        });
+
+        settings.store.keywordEntries.forEach(entry => {
+            // add default ignoreBots value config migration
+            entry.ignoreBots = entry.ignoreBots ?? settings.store.ignoreBots;
+
+            // add default enabled value config migration
+            entry.enabled = entry.enabled ?? true;
+
+            // new whitelist and blacklist system migration
+            entry.whitelist = entry.whitelist ?? [];
+            entry.blacklist = entry.blacklist ?? [];
+            entry.listPriority = entry.listPriority ?? ListType.BlackList;
+
+            // skip if already migrated whitelist and blacklist
+            if (entry.listType == null || entry.listIds == null) return;
+
+            if (entry.listType === ListType.Whitelist) {
+                entry.whitelist = entry.listIds;
+            } else {
+                entry.blacklist = entry.listIds;
+            }
+            delete entry.listIds;
+            delete entry.listType;
+        });
+
+        // save migrated data to DataStore
+        // NOTE: consider removing DataStore for KEYWORD_ENTRIES_KEY at all
+        await DataStore.set(KEYWORD_ENTRIES_KEY, settings.plain.keywordEntries);
     },
 
     doesMatchAnyKeyword(m: MessageJsonFixed): boolean {

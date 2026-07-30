@@ -33,6 +33,10 @@ export interface KeywordEntry {
     whitelist: string[];
     blacklist: string[];
     listPriority: ListType;
+
+    // XXX: Deprecated config
+    listIds?: string[];
+    listType?: ListType;
 }
 
 export enum ListType {
