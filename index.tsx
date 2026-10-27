@@ -179,9 +179,10 @@ export default definePlugin({
         }
     },
 
-    async start() {
-        this.onUpdate = () => null;
+    onUpdate: () => {},
+    RenderMsg: (_: { message: Message, onJump: () => void; }) => <></>,
 
+    async start() {
         await this.applyMigrations();
 
         (await DataStore.get<string[]>(KEYWORD_LOG_KEY) ?? []).map(e => JSON.parse(e) as MessageJsonFixed).forEach(e => {
