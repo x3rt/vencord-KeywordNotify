@@ -151,8 +151,8 @@ export default definePlugin({
             group: true,
             replacement: [
                 {
-                    match: /,(?:(?:\i&&)?\i\?\(0,\i\.jsxs?\)\(\i\.\i\.Item)/,
-                    replace: ",$self.keywordTabBar()$&",
+                    match: /\w+\.\w+\.Item,{.{0,50}\w+\.\w+\.SCHEDULED,.{0,100}(?=])/,
+                    replace: "$&,$self.keywordTabBar()",
                 },
                 {
                     match: /:(\i)===\i\.\i\.MENTIONS\?\(0,.{0,500}null}/,
