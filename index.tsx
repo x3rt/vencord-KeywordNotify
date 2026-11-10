@@ -151,7 +151,7 @@ export default definePlugin({
             group: true,
             replacement: [
                 {
-                    match: /\w+\.\w+\.Item,{.{0,50}\w+\.\w+\.SCHEDULED,.{0,100}(?=])/,
+                    match: /\w+\.\w+\.Item,{.{0,60}\i\.\i\.SCHEDULED,.{0,110}(?=])/,
                     replace: "$&,$self.keywordTabBar()",
                 },
                 {
